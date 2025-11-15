@@ -8,9 +8,37 @@ Route::get('/', function () {
     return view('welcome');
 })->name('home');
 
-Route::view('dashboard', 'dashboard')
-    ->middleware(['auth', 'verified'])
-    ->name('dashboard');
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('dashboard', function () {
+        $user = auth()->user();
+
+        // Load role with eager loading to avoid N+1 queries
+        $user->loadMissing('role');
+
+        if (! $user->role) {
+            return redirect()->route('profile.edit');
+        }
+
+        return match ($user->role->slug) {
+            'super_admin' => redirect()->route('dashboard.admin'),
+            'call_center_owner' => redirect()->route('dashboard.owner'),
+            'agent' => redirect()->route('dashboard.agent'),
+            default => redirect()->route('profile.edit'),
+        };
+    })->name('dashboard');
+
+    Volt::route('admin/dashboard', 'dashboard.super-admin')
+        ->middleware('role:super_admin')
+        ->name('dashboard.admin');
+
+    Volt::route('owner/dashboard', 'dashboard.call-center-owner')
+        ->middleware('role:call_center_owner')
+        ->name('dashboard.owner');
+
+    Volt::route('agent/dashboard', 'dashboard.agent')
+        ->middleware('role:agent')
+        ->name('dashboard.agent');
+});
 
 Route::middleware(['auth'])->group(function () {
     Route::redirect('settings', 'settings/profile');

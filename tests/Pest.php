@@ -15,6 +15,14 @@ pest()->extend(Tests\TestCase::class)
     ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
     ->in('Feature');
 
+// Ensure migrations run correctly in all Feature tests
+beforeEach(function () {
+    if (str_contains($this->getName(), 'Feature')) {
+        require_once __DIR__.'/Feature/Sprint1/EnsureMigrationsRun.php';
+        ensureMigrationsRun();
+    }
+})->in('Feature');
+
 /*
 |--------------------------------------------------------------------------
 | Expectations
