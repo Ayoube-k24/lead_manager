@@ -71,6 +71,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('owner.leads.assign');
         Volt::route('owner/distribution', 'owner.distribution')
             ->name('owner.distribution');
+
+        // Sprint 5: Statistiques avancées (Propriétaire)
+        Volt::route('owner/statistics', 'owner.statistics')
+            ->name('owner.statistics');
+        Route::get('owner/statistics/export/csv', [\App\Http\Controllers\ExportController::class, 'exportStatisticsCsv'])
+            ->name('owner.statistics.export.csv');
+        Route::get('owner/statistics/export/pdf', [\App\Http\Controllers\ExportController::class, 'exportStatisticsPdf'])
+            ->name('owner.statistics.export.pdf');
+        Route::get('owner/leads/export/csv', [\App\Http\Controllers\ExportController::class, 'exportLeadsCsv'])
+            ->name('owner.leads.export.csv');
     });
 
     // Sprint 2: Gestion des formulaires et profils SMTP (Super Admin uniquement)
@@ -106,6 +116,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('admin.leads');
         Volt::route('admin/leads/{lead}', 'admin.leads.show')
             ->name('admin.leads.show');
+
+        // Sprint 5: Statistiques avancées (Super Admin)
+        Volt::route('admin/statistics', 'admin.statistics')
+            ->name('admin.statistics');
+        Route::get('admin/statistics/export/csv', [\App\Http\Controllers\ExportController::class, 'exportStatisticsCsv'])
+            ->name('admin.statistics.export.csv');
+        Route::get('admin/statistics/export/pdf', [\App\Http\Controllers\ExportController::class, 'exportStatisticsPdf'])
+            ->name('admin.statistics.export.pdf');
+        Route::get('admin/leads/export/csv', [\App\Http\Controllers\ExportController::class, 'exportLeadsCsv'])
+            ->name('admin.leads.export.csv');
     });
 });
 

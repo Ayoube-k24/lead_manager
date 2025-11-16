@@ -22,6 +22,7 @@
                         <flux:navlist.item icon="envelope" :href="route('admin.smtp-profiles')" :current="request()->routeIs('admin.smtp-profiles*')" wire:navigate>{{ __('Profils SMTP') }}</flux:navlist.item>
                         <flux:navlist.item icon="document-duplicate" :href="route('admin.email-templates')" :current="request()->routeIs('admin.email-templates*')" wire:navigate>{{ __('Templates d\'email') }}</flux:navlist.item>
                         <flux:navlist.item icon="user-group" :href="route('admin.leads')" :current="request()->routeIs('admin.leads*')" wire:navigate>{{ __('Leads') }}</flux:navlist.item>
+                        <flux:navlist.item icon="chart-bar" :href="route('admin.statistics')" :current="request()->routeIs('admin.statistics*')" wire:navigate>{{ __('Statistiques') }}</flux:navlist.item>
                     </flux:navlist.group>
                 @endif
 
@@ -30,6 +31,7 @@
                         <flux:navlist.item icon="users" :href="route('owner.agents')" :current="request()->routeIs('owner.agents*')" wire:navigate>{{ __('Agents') }}</flux:navlist.item>
                         <flux:navlist.item icon="user-group" :href="route('owner.leads')" :current="request()->routeIs('owner.leads*')" wire:navigate>{{ __('Leads') }}</flux:navlist.item>
                         <flux:navlist.item icon="arrows-right-left" :href="route('owner.distribution')" :current="request()->routeIs('owner.distribution*')" wire:navigate>{{ __('Distribution') }}</flux:navlist.item>
+                        <flux:navlist.item icon="chart-bar" :href="route('owner.statistics')" :current="request()->routeIs('owner.statistics*')" wire:navigate>{{ __('Statistiques') }}</flux:navlist.item>
                     </flux:navlist.group>
                 @endif
 
