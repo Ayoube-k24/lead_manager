@@ -13,7 +13,7 @@ beforeEach(function () {
 test('super admin is redirected to /admin/dashboard after login', function () {
     $role = Role::where('slug', 'super_admin')->firstOrFail();
 
-    $user = User::factory()->create([
+    $user = User::factory()->withoutTwoFactor()->create([
         'role_id' => $role->id,
         'password' => Hash::make('password'),
         'email_verified_at' => now(),
@@ -31,7 +31,7 @@ test('super admin is redirected to /admin/dashboard after login', function () {
 test('call center owner is redirected to /owner/dashboard after login', function () {
     $role = Role::where('slug', 'call_center_owner')->firstOrFail();
 
-    $owner = User::factory()->create([
+    $owner = User::factory()->withoutTwoFactor()->create([
         'role_id' => $role->id,
         'password' => Hash::make('password'),
         'email_verified_at' => now(),
@@ -59,7 +59,7 @@ test('agent is redirected to /agent/dashboard after login', function () {
     $ownerRole = Role::where('slug', 'call_center_owner')->firstOrFail();
     $agentRole = Role::where('slug', 'agent')->firstOrFail();
 
-    $owner = User::factory()->create([
+    $owner = User::factory()->withoutTwoFactor()->create([
         'role_id' => $ownerRole->id,
         'password' => Hash::make('password'),
         'email_verified_at' => now(),
@@ -72,7 +72,7 @@ test('agent is redirected to /agent/dashboard after login', function () {
         'is_active' => true,
     ]);
 
-    $agent = User::factory()->create([
+    $agent = User::factory()->withoutTwoFactor()->create([
         'role_id' => $agentRole->id,
         'call_center_id' => $callCenter->id,
         'password' => Hash::make('password'),

@@ -13,6 +13,12 @@ return new class extends Migration
     {
         Schema::create('forms', function (Blueprint $table) {
             $table->id();
+            $table->string('name');
+            $table->text('description')->nullable();
+            $table->json('fields')->nullable();
+            $table->foreignId('smtp_profile_id')->nullable()->constrained('smtp_profiles')->nullOnDelete();
+            $table->foreignId('email_template_id')->nullable()->constrained('email_templates')->nullOnDelete();
+            $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
     }

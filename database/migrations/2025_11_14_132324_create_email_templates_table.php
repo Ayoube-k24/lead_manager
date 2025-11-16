@@ -11,8 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('email_templates')) {
+            Schema::dropIfExists('email_templates');
+        }
+
         Schema::create('email_templates', function (Blueprint $table) {
             $table->id();
+            $table->string('name');
+            $table->string('subject');
+            $table->text('body_html');
+            $table->text('body_text')->nullable();
+            $table->json('variables')->nullable()->comment('Available variables for template');
             $table->timestamps();
         });
     }

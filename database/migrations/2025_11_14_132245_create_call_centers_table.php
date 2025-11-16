@@ -13,6 +13,11 @@ return new class extends Migration
     {
         Schema::create('call_centers', function (Blueprint $table) {
             $table->id();
+            $table->string('name');
+            $table->text('description')->nullable();
+            $table->foreignId('owner_id')->constrained('users')->cascadeOnDelete();
+            $table->string('distribution_method')->default('round_robin')->comment('round_robin, weighted, manual');
+            $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
     }

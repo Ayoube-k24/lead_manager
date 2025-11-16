@@ -13,6 +13,11 @@ beforeEach(function () {
 
 test('super admin is redirected to admin dashboard after login', function () {
     $user = User::where('email', 'admin@leadmanager.com')->first();
+    $user->update([
+        'two_factor_secret' => null,
+        'two_factor_recovery_codes' => null,
+        'two_factor_confirmed_at' => null,
+    ]);
 
     $response = $this->post('/login', [
         'email' => 'admin@leadmanager.com',
@@ -25,6 +30,11 @@ test('super admin is redirected to admin dashboard after login', function () {
 
 test('call center owner is redirected to owner dashboard after login', function () {
     $user = User::where('email', 'owner@leadmanager.com')->first();
+    $user->update([
+        'two_factor_secret' => null,
+        'two_factor_recovery_codes' => null,
+        'two_factor_confirmed_at' => null,
+    ]);
 
     $response = $this->post('/login', [
         'email' => 'owner@leadmanager.com',
@@ -37,6 +47,11 @@ test('call center owner is redirected to owner dashboard after login', function 
 
 test('agent is redirected to agent dashboard after login', function () {
     $user = User::where('email', 'agent1@leadmanager.com')->first();
+    $user->update([
+        'two_factor_secret' => null,
+        'two_factor_recovery_codes' => null,
+        'two_factor_confirmed_at' => null,
+    ]);
 
     $response = $this->post('/login', [
         'email' => 'agent1@leadmanager.com',
@@ -49,7 +64,7 @@ test('agent is redirected to agent dashboard after login', function () {
 
 test('user without role is redirected to dashboard route', function () {
     $role = Role::factory()->create(['slug' => 'unknown_role']);
-    $user = User::factory()->create([
+    $user = User::factory()->withoutTwoFactor()->create([
         'email' => 'unknown@example.com',
         'password' => \Illuminate\Support\Facades\Hash::make('password'),
         'role_id' => $role->id,

@@ -16,7 +16,8 @@ function ensureMigrationsRun(): void
         $columns = DB::select('PRAGMA table_info(roles)');
         $columnNames = array_column($columns, 'name');
 
-        if (count($columnNames) < 6) {
+        // Check if name column exists
+        if (! in_array('name', $columnNames) || count($columnNames) < 6) {
             Schema::dropIfExists('roles');
             Schema::create('roles', function ($table) {
                 $table->id();

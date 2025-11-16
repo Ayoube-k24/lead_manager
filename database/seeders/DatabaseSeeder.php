@@ -20,6 +20,9 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RoleSeeder::class,
             UserSeeder::class,
+            SmtpProfileSeeder::class,
+            EmailTemplateSeeder::class,
+            FormSeeder::class,
         ]);
 
         $this->command->newLine();

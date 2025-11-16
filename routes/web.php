@@ -10,6 +10,7 @@ Route::get('/', function () {
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function () {
+        /** @var \App\Models\User|null $user */
         $user = auth()->user();
 
         // Load role with eager loading to avoid N+1 queries
@@ -38,6 +39,35 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Volt::route('agent/dashboard', 'dashboard.agent')
         ->middleware('role:agent')
         ->name('dashboard.agent');
+
+    // Sprint 2: Gestion des formulaires et profils SMTP (Super Admin uniquement)
+    Route::middleware('role:super_admin')->group(function () {
+        // Profils SMTP
+        Volt::route('admin/smtp-profiles', 'admin.smtp-profiles')
+            ->name('admin.smtp-profiles');
+        Volt::route('admin/smtp-profiles/create', 'admin.smtp-profiles.create')
+            ->name('admin.smtp-profiles.create');
+        Volt::route('admin/smtp-profiles/{smtpProfile}/edit', 'admin.smtp-profiles.edit')
+            ->name('admin.smtp-profiles.edit');
+
+        // Templates d'email
+        Volt::route('admin/email-templates', 'admin.email-templates')
+            ->name('admin.email-templates');
+        Volt::route('admin/email-templates/create', 'admin.email-templates.create')
+            ->name('admin.email-templates.create');
+        Volt::route('admin/email-templates/{emailTemplate}/edit', 'admin.email-templates.edit')
+            ->name('admin.email-templates.edit');
+
+        // Formulaires
+        Volt::route('admin/forms', 'admin.forms')
+            ->name('admin.forms');
+        Volt::route('admin/forms/create', 'admin.forms.create')
+            ->name('admin.forms.create');
+        Volt::route('admin/forms/{form}/edit', 'admin.forms.edit')
+            ->name('admin.forms.edit');
+        Volt::route('admin/forms/{form}/preview', 'admin.forms.preview')
+            ->name('admin.forms.preview');
+    });
 });
 
 Route::middleware(['auth'])->group(function () {

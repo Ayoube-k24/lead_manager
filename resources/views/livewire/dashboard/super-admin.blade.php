@@ -73,7 +73,7 @@ new class extends Component {
                 </div>
             </div>
 
-            <div class="rounded-xl border border-neutral-200 bg-white p-6 dark:border-neutral-700 dark:bg-neutral-800">
+            <a href="{{ route('admin.forms') }}" wire:navigate class="rounded-xl border border-neutral-200 bg-white p-6 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:hover:bg-neutral-700">
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-sm text-neutral-600 dark:text-neutral-400">{{ __('Formulaires') }}</p>
@@ -85,7 +85,7 @@ new class extends Component {
                         </svg>
                     </div>
                 </div>
-            </div>
+            </a>
 
             <div class="rounded-xl border border-neutral-200 bg-white p-6 dark:border-neutral-700 dark:bg-neutral-800">
                 <div class="flex items-center justify-between">
@@ -122,9 +122,21 @@ new class extends Component {
         <!-- Section supplémentaire pour Super Admin -->
         <div class="rounded-xl border-2 border-purple-200 bg-purple-50 p-6 dark:border-purple-800 dark:bg-purple-900/20">
             <h2 class="mb-4 text-xl font-bold text-purple-900 dark:text-purple-100">🔑 Accès Administrateur</h2>
-            <p class="text-purple-700 dark:text-purple-300">
+            <p class="mb-4 text-purple-700 dark:text-purple-300">
                 En tant que Super Administrateur, vous avez un accès complet à toutes les fonctionnalités de la plateforme, 
                 y compris la gestion des utilisateurs, des centres d'appels, des formulaires et des configurations système.
             </p>
+            
+            <div class="grid gap-3 md:grid-cols-3">
+                <flux:button href="{{ route('admin.forms') }}" variant="primary" class="w-full" wire:navigate>
+                    {{ __('Gérer les Formulaires') }}
+                </flux:button>
+                <flux:button href="{{ route('admin.smtp-profiles') }}" variant="primary" class="w-full" wire:navigate>
+                    {{ __('Gérer les Profils SMTP') }}
+                </flux:button>
+                <flux:button href="{{ route('admin.email-templates') }}" variant="primary" class="w-full" wire:navigate>
+                    {{ __('Gérer les Templates') }}
+                </flux:button>
+            </div>
         </div>
 </section>
