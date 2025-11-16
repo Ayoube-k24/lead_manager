@@ -68,4 +68,60 @@ class Lead extends Model
     {
         return $this->belongsTo(CallCenter::class);
     }
+
+    /**
+     * Check if email is confirmed.
+     */
+    public function isEmailConfirmed(): bool
+    {
+        return $this->email_confirmed_at !== null;
+    }
+
+    /**
+     * Check if confirmation token is valid.
+     */
+    public function isConfirmationTokenValid(): bool
+    {
+        if (! $this->email_confirmation_token) {
+            return false;
+        }
+
+        if ($this->email_confirmation_token_expires_at && $this->email_confirmation_token_expires_at->isPast()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Confirm the email.
+     */
+    public function confirmEmail(): void
+    {
+        $this->email_confirmed_at = now();
+        $this->status = 'email_confirmed';
+        $this->save();
+    }
+
+    /**
+     * Mark as pending call.
+     */
+    public function markAsPendingCall(): void
+    {
+        $this->status = 'pending_call';
+        $this->save();
+    }
+
+    /**
+     * Update status after call.
+     */
+    public function updateAfterCall(string $status, ?string $comment = null): void
+    {
+        $this->status = $status;
+        $this->called_at = now();
+        if ($comment) {
+            $this->call_comment = $comment;
+        }
+        $this->save();
+    }
 }

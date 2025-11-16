@@ -8,6 +8,13 @@ Route::get('/', function () {
     return view('welcome');
 })->name('home');
 
+// Sprint 3: Routes publiques pour les formulaires et confirmation email
+Route::post('forms/{form}/submit', [\App\Http\Controllers\PublicFormController::class, 'submit'])
+    ->name('forms.submit');
+
+Route::get('leads/confirm-email/{token}', [\App\Http\Controllers\LeadConfirmationController::class, 'confirm'])
+    ->name('leads.confirm-email');
+
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function () {
         /** @var \App\Models\User|null $user */
@@ -39,6 +46,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Volt::route('agent/dashboard', 'dashboard.agent')
         ->middleware('role:agent')
         ->name('dashboard.agent');
+
+    // Sprint 3: Gestion des leads par les agents
+    Route::middleware('role:agent')->group(function () {
+        Volt::route('agent/leads', 'agent.leads')
+            ->name('agent.leads');
+        Volt::route('agent/leads/{lead}', 'agent.leads.show')
+            ->name('agent.leads.show');
+    });
 
     // Sprint 2: Gestion des formulaires et profils SMTP (Super Admin uniquement)
     Route::middleware('role:super_admin')->group(function () {
