@@ -23,6 +23,7 @@
                         <flux:navlist.item icon="document-duplicate" :href="route('admin.email-templates')" :current="request()->routeIs('admin.email-templates*')" wire:navigate>{{ __('Templates d\'email') }}</flux:navlist.item>
                         <flux:navlist.item icon="user-group" :href="route('admin.leads')" :current="request()->routeIs('admin.leads*')" wire:navigate>{{ __('Leads') }}</flux:navlist.item>
                         <flux:navlist.item icon="chart-bar" :href="route('admin.statistics')" :current="request()->routeIs('admin.statistics*')" wire:navigate>{{ __('Statistiques') }}</flux:navlist.item>
+                        <flux:navlist.item icon="document-text" :href="route('admin.audit-logs')" :current="request()->routeIs('admin.audit-logs*')" wire:navigate>{{ __('Journal d\'Audit') }}</flux:navlist.item>
                     </flux:navlist.group>
                 @endif
 

@@ -126,6 +126,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('admin.statistics.export.pdf');
         Route::get('admin/leads/export/csv', [\App\Http\Controllers\ExportController::class, 'exportLeadsCsv'])
             ->name('admin.leads.export.csv');
+
+        // Sprint 6: Audit des actions (Super Admin)
+        Volt::route('admin/audit-logs', 'admin.audit-logs')
+            ->name('admin.audit-logs');
     });
 });
 

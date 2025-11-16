@@ -9,6 +9,10 @@ use Illuminate\Support\Facades\DB;
 
 class LeadDistributionService
 {
+    public function __construct(
+        protected AuditService $auditService
+    ) {}
+
     /**
      * Distribute a lead to an agent based on the call center's distribution method.
      */
@@ -166,6 +170,9 @@ class LeadDistributionService
         $saved = $lead->save();
 
         if ($saved) {
+            // Log the assignment
+            $this->auditService->logLeadAssigned($lead, $agent);
+
             // Send notification to agent
             $agent->notify(new \App\Notifications\LeadAssignedNotification($lead));
         }

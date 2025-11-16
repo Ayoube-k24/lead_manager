@@ -3,6 +3,7 @@
 use App\Models\CallCenter;
 use App\Models\Lead;
 use App\Models\User;
+use App\Services\AuditService;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Volt\Component;
 
@@ -20,7 +21,7 @@ new class extends Component
         }
     }
 
-    public function updateDistributionMethod(): void
+    public function updateDistributionMethod(AuditService $auditService): void
     {
         $this->validate([
             'distributionMethod' => ['required', 'in:round_robin,weighted,manual'],
@@ -34,8 +35,14 @@ new class extends Component
             return;
         }
 
+        $oldMethod = $callCenter->distribution_method;
         $callCenter->distribution_method = $this->distributionMethod;
         $callCenter->save();
+
+        // Log the change
+        if ($oldMethod !== $this->distributionMethod) {
+            $auditService->logDistributionMethodChanged($callCenter, $oldMethod, $this->distributionMethod);
+        }
 
         $this->dispatch('distribution-method-updated');
     }

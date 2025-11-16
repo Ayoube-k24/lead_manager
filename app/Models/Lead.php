@@ -117,11 +117,20 @@ class Lead extends Model
      */
     public function updateAfterCall(string $status, ?string $comment = null): void
     {
+        $oldStatus = $this->status;
         $this->status = $status;
         $this->called_at = now();
         if ($comment) {
             $this->call_comment = $comment;
         }
         $this->save();
+
+        // Log the status update
+        try {
+            $auditService = app(\App\Services\AuditService::class);
+            $auditService->logLeadStatusUpdated($this, $oldStatus, $status, $comment);
+        } catch (\Exception $e) {
+            // Silently fail if audit service is not available (e.g., in tests)
+        }
     }
 }
