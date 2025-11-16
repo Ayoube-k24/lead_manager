@@ -130,9 +130,46 @@ new class extends Component {
         <!-- Section supplémentaire pour Propriétaire -->
         <div class="rounded-xl border-2 border-blue-200 bg-blue-50 p-6 dark:border-blue-800 dark:bg-blue-900/20">
             <h2 class="mb-4 text-xl font-bold text-blue-900 dark:text-blue-100">📊 Gestion de votre Centre d'Appels</h2>
-            <p class="text-blue-700 dark:text-blue-300">
+            <p class="mb-4 text-blue-700 dark:text-blue-300">
                 En tant que Propriétaire, vous pouvez gérer vos agents, consulter les performances de votre équipe 
                 et suivre l'évolution des leads de votre centre d'appels.
             </p>
+            
+            <div class="grid gap-3 md:grid-cols-3">
+                <flux:button href="{{ route('owner.agents') }}" variant="primary" class="w-full" wire:navigate>
+                    {{ __('Gérer les Agents') }}
+                </flux:button>
+                <flux:button href="{{ route('owner.leads') }}" variant="primary" class="w-full" wire:navigate>
+                    {{ __('Gérer les Leads') }}
+                </flux:button>
+                <flux:button href="{{ route('owner.distribution') }}" variant="primary" class="w-full" wire:navigate>
+                    {{ __('Configuration Distribution') }}
+                </flux:button>
+            </div>
+        </div>
+
+        <!-- Actions rapides -->
+        <div class="rounded-xl border border-neutral-200 bg-white p-6 dark:border-neutral-700 dark:bg-neutral-800">
+            <h2 class="mb-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{{ __('Actions rapides') }}</h2>
+            <div class="grid gap-3 sm:grid-cols-3">
+                <flux:button href="{{ route('owner.agents.create') }}" variant="ghost" class="w-full justify-start" wire:navigate>
+                    <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    {{ __('Créer un agent') }}
+                </flux:button>
+                <flux:button href="{{ route('owner.leads') }}" variant="ghost" class="w-full justify-start" wire:navigate>
+                    <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    {{ __('Voir tous les leads') }}
+                </flux:button>
+                <flux:button href="{{ route('owner.distribution') }}" variant="ghost" class="w-full justify-start" wire:navigate>
+                    <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                    {{ __('Configurer distribution') }}
+                </flux:button>
+            </div>
         </div>
 </section>

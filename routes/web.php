@@ -55,6 +55,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('agent.leads.show');
     });
 
+    // Sprint 4: Gestion des agents par les propriétaires de centres d'appels
+    Route::middleware('role:call_center_owner')->group(function () {
+        Volt::route('owner/agents', 'owner.agents')
+            ->name('owner.agents');
+        Volt::route('owner/agents/create', 'owner.agents.create')
+            ->name('owner.agents.create');
+        Volt::route('owner/agents/{user}/edit', 'owner.agents.edit')
+            ->name('owner.agents.edit');
+        Volt::route('owner/agents/{user}/stats', 'owner.agents.stats')
+            ->name('owner.agents.stats');
+        Volt::route('owner/leads', 'owner.leads')
+            ->name('owner.leads');
+        Volt::route('owner/leads/{lead}/assign', 'owner.leads.assign')
+            ->name('owner.leads.assign');
+        Volt::route('owner/distribution', 'owner.distribution')
+            ->name('owner.distribution');
+    });
+
     // Sprint 2: Gestion des formulaires et profils SMTP (Super Admin uniquement)
     Route::middleware('role:super_admin')->group(function () {
         // Profils SMTP
@@ -82,6 +100,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('admin.forms.edit');
         Volt::route('admin/forms/{form}/preview', 'admin.forms.preview')
             ->name('admin.forms.preview');
+
+        // Sprint 4: Gestion des leads (Super Admin)
+        Volt::route('admin/leads', 'admin.leads')
+            ->name('admin.leads');
+        Volt::route('admin/leads/{lead}', 'admin.leads.show')
+            ->name('admin.leads.show');
     });
 });
 

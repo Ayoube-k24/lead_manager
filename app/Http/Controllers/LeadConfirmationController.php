@@ -3,10 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\Lead;
+use App\Services\LeadDistributionService;
 use Illuminate\Http\Request;
 
 class LeadConfirmationController extends Controller
 {
+    public function __construct(
+        protected LeadDistributionService $distributionService
+    ) {}
+
     /**
      * Confirm email using token.
      */
@@ -34,6 +39,15 @@ class LeadConfirmationController extends Controller
 
         // Confirm the email
         $lead->confirmEmail();
+
+        // Try to automatically distribute the lead to an agent
+        if (! $lead->assigned_to && $lead->call_center_id) {
+            $agent = $this->distributionService->distributeLead($lead);
+            if ($agent) {
+                $this->distributionService->assignToAgent($lead, $agent);
+                $lead->markAsPendingCall();
+            }
+        }
 
         return view('leads.confirmation-success', [
             'message' => 'Votre email a été confirmé avec succès. Un agent vous contactera prochainement.',
