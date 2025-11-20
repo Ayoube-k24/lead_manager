@@ -114,6 +114,29 @@ new class extends Component {
         <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">{{ __('Modifiez le formulaire de capture de leads') }}</p>
     </div>
 
+    <!-- UID & API info -->
+    <div class="rounded-xl border border-neutral-200 bg-white p-6 dark:border-neutral-700 dark:bg-neutral-800">
+        <h2 class="mb-4 text-lg font-semibold">{{ __('Identifiant API du formulaire') }}</h2>
+        <p class="mb-4 text-sm text-neutral-600 dark:text-neutral-400">
+            {{ __('Utilisez cet identifiant pour connecter vos landing pages à l’API publique d’insertion de leads.') }}
+        </p>
+        <div class="grid gap-4 md:grid-cols-2">
+            <flux:input
+                value="{{ $form->uid }}"
+                :label="__('UID (12 caractères)')"
+                readonly
+            />
+            <flux:input
+                value="{{ route('forms.submit', $form) }}"
+                :label="__('Endpoint API (POST)')"
+                readonly
+            />
+        </div>
+        <flux:callout class="mt-4" variant="neutral" icon="information-circle">
+            {{ __('Endpoint d’exemple : POST ') }}<code class="rounded bg-neutral-100 px-2 py-1 text-xs dark:bg-neutral-900">curl -X POST {{ route('forms.submit', $form) }}</code>
+        </flux:callout>
+    </div>
+
     <form wire:submit="update" class="space-y-6">
         <div class="rounded-xl border border-neutral-200 bg-white p-6 dark:border-neutral-700 dark:bg-neutral-800">
             <h2 class="mb-4 text-lg font-semibold">{{ __('Informations générales') }}</h2>
@@ -291,6 +314,163 @@ new class extends Component {
             </div>
         </div>
 
+        <!-- Section d'aide pour l'utilisation de l'API -->
+        <div class="rounded-xl border border-blue-200 bg-blue-50 p-6 dark:border-blue-800 dark:bg-blue-900/20">
+            <div class="mb-4 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <svg class="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <h2 class="text-lg font-semibold text-blue-900 dark:text-blue-100">{{ __('Comment utiliser ce formulaire') }}</h2>
+                </div>
+                <button type="button" onclick="toggleApiHelp()" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200">
+                    <svg id="api-help-icon" class="h-5 w-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+            </div>
+            
+            <div id="api-help-content" class="hidden space-y-4">
+                <div class="rounded-lg border border-blue-200 bg-white p-4 dark:border-blue-700 dark:bg-neutral-800">
+                    <h3 class="mb-2 font-semibold text-blue-900 dark:text-blue-100">{{ __('URL de l\'API') }}</h3>
+                    <div class="flex items-center gap-2">
+                        <code class="flex-1 rounded bg-neutral-100 px-3 py-2 text-sm dark:bg-neutral-900" id="api-url">{{ route('forms.submit', $form) }}</code>
+                        <button type="button" onclick="copyApiUrl()" class="rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700">
+                            {{ __('Copier') }}
+                        </button>
+                    </div>
+                </div>
+
+                <div class="rounded-lg border border-blue-200 bg-white p-4 dark:border-blue-700 dark:bg-neutral-800">
+                    <h3 class="mb-2 font-semibold text-blue-900 dark:text-blue-100">{{ __('Méthode HTTP') }}</h3>
+                    <code class="rounded bg-neutral-100 px-3 py-2 text-sm dark:bg-neutral-900">POST</code>
+                </div>
+
+                <div class="rounded-lg border border-blue-200 bg-white p-4 dark:border-blue-700 dark:bg-neutral-800">
+                    <h3 class="mb-3 font-semibold text-blue-900 dark:text-blue-100">{{ __('Exemple de code JavaScript pour landing page') }}</h3>
+                    <pre class="overflow-x-auto rounded bg-neutral-900 p-4 text-sm text-neutral-100"><code id="js-example">// Configuration
+const FORM_UID = '{{ $form->uid }}';
+const API_URL = '{{ route('forms.submit', $form) }}';
+
+// Fonction pour soumettre le formulaire
+async function submitForm(formData) {
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify(formData)
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            // Succès
+            alert(data.message || 'Formulaire soumis avec succès !');
+            // Réinitialiser le formulaire ou rediriger
+            document.getElementById('leadForm').reset();
+        } else {
+            // Erreur de validation
+            if (data.errors) {
+                let errorMessage = 'Erreurs de validation :\n';
+                for (const [field, errors] of Object.entries(data.errors)) {
+                    errorMessage += `- ${field}: ${errors.join(', ')}\n`;
+                }
+                alert(errorMessage);
+            } else {
+                alert(data.message || 'Une erreur est survenue.');
+            }
+        }
+    } catch (error) {
+        console.error('Erreur:', error);
+        alert('Une erreur réseau est survenue. Veuillez réessayer.');
+    }
+}
+
+// Exemple d'utilisation avec un formulaire HTML
+document.getElementById('leadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const data = {};
+    
+    // Convertir FormData en objet
+    formData.forEach((value, key) => {
+        data[key] = value;
+    });
+    
+    // Soumettre via l'API
+    await submitForm(data);
+});
+
+// Exemple avec jQuery (si vous utilisez jQuery)
+/*
+$('#leadForm').on('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = $(this).serializeArray();
+    const data = {};
+    
+    $.each(formData, function(i, field) {
+        data[field.name] = field.value;
+    });
+    
+    await submitForm(data);
+});
+*/</code></pre>
+                    <button type="button" onclick="copyJsExample()" class="mt-2 rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700">
+                        {{ __('Copier le code JavaScript') }}
+                    </button>
+                </div>
+
+                <div class="rounded-lg border border-blue-200 bg-white p-4 dark:border-blue-700 dark:bg-neutral-800">
+                    <h3 class="mb-2 font-semibold text-blue-900 dark:text-blue-100">{{ __('Exemple de formulaire HTML') }}</h3>
+                    <pre class="overflow-x-auto rounded bg-neutral-900 p-4 text-sm text-neutral-100"><code id="html-example">&lt;form id="leadForm"&gt;
+    &lt;div class="form-group"&gt;
+        &lt;label for="name"&gt;Nom complet *&lt;/label&gt;
+        &lt;input type="text" id="name" name="name" required placeholder="Votre nom"&gt;
+    &lt;/div&gt;
+    &lt;div class="form-group"&gt;
+        &lt;label for="email"&gt;Email *&lt;/label&gt;
+        &lt;input type="email" id="email" name="email" required placeholder="votre@email.com"&gt;
+    &lt;/div&gt;
+    &lt;div class="form-group"&gt;
+        &lt;label for="phone"&gt;Téléphone&lt;/label&gt;
+        &lt;input type="tel" id="phone" name="phone" placeholder="+33 6 12 34 56 78"&gt;
+    &lt;/div&gt;
+    &lt;button type="submit"&gt;Envoyer&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;!-- Note: Adaptez les champs selon votre formulaire --&gt;</code></pre>
+                    <button type="button" onclick="copyHtmlExample()" class="mt-2 rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700">
+                        {{ __('Copier le code HTML') }}
+                    </button>
+                    <p class="mt-2 text-xs text-neutral-600 dark:text-neutral-400">
+                        {{ __('Note: Adaptez les champs (name, email, phone, etc.) selon les champs définis dans votre formulaire ci-dessus.') }}
+                    </p>
+                </div>
+
+                <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
+                    <h3 class="mb-2 flex items-center gap-2 font-semibold text-amber-900 dark:text-amber-100">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        {{ __('Points importants') }}
+                    </h3>
+                    <ul class="ml-6 list-disc space-y-1 text-sm text-amber-800 dark:text-amber-200">
+                        <li>{{ __('L\'API accepte uniquement les requêtes POST en JSON') }}</li>
+                        <li>{{ __('Le header Content-Type doit être application/json') }}</li>
+                        <li>{{ __('Tous les champs marqués comme obligatoires doivent être fournis') }}</li>
+                        <li>{{ __('Un champ email est requis pour créer un lead') }}</li>
+                        <li>{{ __('En cas de succès, un email de confirmation sera envoyé au lead') }}</li>
+                        <li>{{ __('Les erreurs de validation retournent un code 422 avec les détails') }}</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
         <!-- Actions -->
         <div class="flex items-center justify-between border-t border-neutral-200 pt-6 dark:border-neutral-700">
             <flux:button href="{{ route('admin.forms') }}" variant="ghost" wire:navigate>
@@ -303,4 +483,34 @@ new class extends Component {
         </div>
     </form>
 </div>
+
+<script>
+function toggleApiHelp() {
+    const content = document.getElementById('api-help-content');
+    const icon = document.getElementById('api-help-icon');
+    content.classList.toggle('hidden');
+    icon.classList.toggle('rotate-180');
+}
+
+function copyApiUrl() {
+    const url = document.getElementById('api-url').textContent;
+    navigator.clipboard.writeText(url).then(() => {
+        alert('URL copiée dans le presse-papiers !');
+    });
+}
+
+function copyJsExample() {
+    const code = document.getElementById('js-example').textContent;
+    navigator.clipboard.writeText(code).then(() => {
+        alert('Code JavaScript copié dans le presse-papiers !');
+    });
+}
+
+function copyHtmlExample() {
+    const code = document.getElementById('html-example').textContent;
+    navigator.clipboard.writeText(code).then(() => {
+        alert('Code HTML copié dans le presse-papiers !');
+    });
+}
+</script>
 

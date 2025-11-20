@@ -59,3 +59,14 @@ test('super admin can delete form', function () {
 
     expect(Form::find($form->id))->toBeNull();
 });
+
+test('super admin can view form api guide page', function () {
+    $form = Form::factory()->create();
+
+    $response = $this->actingAs($this->superAdmin)
+        ->get(route('admin.forms.info', $form));
+
+    $response->assertOk()
+        ->assertSee($form->uid)
+        ->assertSee('Guide API');
+});

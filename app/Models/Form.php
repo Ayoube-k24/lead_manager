@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class Form extends Model
 {
@@ -19,6 +20,7 @@ class Form extends Model
      * @var list<string>
      */
     protected $fillable = [
+        'uid',
         'name',
         'description',
         'fields',
@@ -26,6 +28,18 @@ class Form extends Model
         'email_template_id',
         'is_active',
     ];
+
+    /**
+     * Bootstrap the model.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (Form $form): void {
+            if (! $form->uid) {
+                $form->uid = static::generateUid();
+            }
+        });
+    }
 
     /**
      * Get the attributes that should be cast.
@@ -62,5 +76,17 @@ class Form extends Model
     public function leads(): HasMany
     {
         return $this->hasMany(Lead::class);
+    }
+
+    /**
+     * Generate a unique 12-character UID.
+     */
+    public static function generateUid(): string
+    {
+        do {
+            $uid = Str::upper(Str::random(12));
+        } while (static::where('uid', $uid)->exists());
+
+        return $uid;
     }
 }

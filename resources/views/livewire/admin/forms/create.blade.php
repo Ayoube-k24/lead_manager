@@ -104,6 +104,10 @@ new class extends Component {
         <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">{{ __('Créez un nouveau formulaire de capture de leads avec validation dynamique') }}</p>
     </div>
 
+    <flux:callout variant="neutral" icon="information-circle">
+        {{ __('Un identifiant API unique de 12 caractères sera généré automatiquement après la création. Utilisez-le pour connecter vos landing pages.') }}
+    </flux:callout>
+
     <form wire:submit="store" class="space-y-6">
         <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
             <h2 class="mb-4 text-lg font-semibold">{{ __('Informations générales') }}</h2>
@@ -284,6 +288,119 @@ new class extends Component {
             </div>
         </div>
 
+        <!-- Section d'aide pour l'utilisation de l'API -->
+        <div class="rounded-xl border border-blue-200 bg-blue-50 p-6 dark:border-blue-800 dark:bg-blue-900/20">
+            <div class="mb-4 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <svg class="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <h2 class="text-lg font-semibold text-blue-900 dark:text-blue-100">{{ __('Comment utiliser ce formulaire') }}</h2>
+                </div>
+                <button type="button" onclick="toggleApiHelp()" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200">
+                    <svg id="api-help-icon" class="h-5 w-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+            </div>
+            
+            <div id="api-help-content" class="hidden space-y-4">
+                <div class="rounded-lg border border-blue-200 bg-white p-4 dark:border-blue-700 dark:bg-neutral-800">
+                    <h3 class="mb-2 font-semibold text-blue-900 dark:text-blue-100">{{ __('URL de l\'API') }}</h3>
+                    <p class="mb-2 text-sm text-neutral-600 dark:text-neutral-400">
+                        {{ __('L\'URL de l\'API sera disponible après la création du formulaire. Format :') }}
+                    </p>
+                    <code class="rounded bg-neutral-100 px-3 py-2 text-sm dark:bg-neutral-900">{{ url('/forms') }}/<span class="text-blue-600 dark:text-blue-400">[FORM_ID]</span>/submit</code>
+                </div>
+
+                <div class="rounded-lg border border-blue-200 bg-white p-4 dark:border-blue-700 dark:bg-neutral-800">
+                    <h3 class="mb-2 font-semibold text-blue-900 dark:text-blue-100">{{ __('Méthode HTTP') }}</h3>
+                    <code class="rounded bg-neutral-100 px-3 py-2 text-sm dark:bg-neutral-900">POST</code>
+                </div>
+
+                <div class="rounded-lg border border-blue-200 bg-white p-4 dark:border-blue-700 dark:bg-neutral-800">
+                    <h3 class="mb-3 font-semibold text-blue-900 dark:text-blue-100">{{ __('Exemple de code JavaScript pour landing page') }}</h3>
+                    <pre class="overflow-x-auto rounded bg-neutral-900 p-4 text-sm text-neutral-100"><code id="js-example">// Configuration - Remplacez FORM_ID par l'ID de votre formulaire
+const FORM_ID = 1; // À remplacer par l'ID du formulaire après création
+const API_URL = `{{ url('/forms') }}/${FORM_ID}/submit`;
+
+// Fonction pour soumettre le formulaire
+async function submitForm(formData) {
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify(formData)
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            // Succès
+            alert(data.message || 'Formulaire soumis avec succès !');
+            // Réinitialiser le formulaire ou rediriger
+            document.getElementById('leadForm').reset();
+        } else {
+            // Erreur de validation
+            if (data.errors) {
+                let errorMessage = 'Erreurs de validation :\n';
+                for (const [field, errors] of Object.entries(data.errors)) {
+                    errorMessage += `- ${field}: ${errors.join(', ')}\n`;
+                }
+                alert(errorMessage);
+            } else {
+                alert(data.message || 'Une erreur est survenue.');
+            }
+        }
+    } catch (error) {
+        console.error('Erreur:', error);
+        alert('Une erreur réseau est survenue. Veuillez réessayer.');
+    }
+}
+
+// Exemple d'utilisation avec un formulaire HTML
+document.getElementById('leadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const data = {};
+    
+    // Convertir FormData en objet
+    formData.forEach((value, key) => {
+        data[key] = value;
+    });
+    
+    // Soumettre via l'API
+    await submitForm(data);
+});</code></pre>
+                    <button type="button" onclick="copyJsExample()" class="mt-2 rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700">
+                        {{ __('Copier le code JavaScript') }}
+                    </button>
+                </div>
+
+                <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
+                    <h3 class="mb-2 flex items-center gap-2 font-semibold text-amber-900 dark:text-amber-100">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        {{ __('Points importants') }}
+                    </h3>
+                    <ul class="ml-6 list-disc space-y-1 text-sm text-amber-800 dark:text-amber-200">
+                        <li>{{ __('L\'API accepte uniquement les requêtes POST en JSON') }}</li>
+                        <li>{{ __('Le header Content-Type doit être application/json') }}</li>
+                        <li>{{ __('Tous les champs marqués comme obligatoires doivent être fournis') }}</li>
+                        <li>{{ __('Un champ email est requis pour créer un lead') }}</li>
+                        <li>{{ __('En cas de succès, un email de confirmation sera envoyé au lead') }}</li>
+                        <li>{{ __('Les erreurs de validation retournent un code 422 avec les détails') }}</li>
+                        <li>{{ __('Notez l\'ID du formulaire après création pour l\'utiliser dans votre code') }}</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
         <!-- Actions -->
         <div class="flex items-center justify-between border-t border-neutral-200 pt-6 dark:border-neutral-700">
             <flux:button href="{{ route('admin.forms') }}" variant="ghost" wire:navigate>
@@ -296,3 +413,19 @@ new class extends Component {
         </div>
     </form>
 </div>
+
+<script>
+function toggleApiHelp() {
+    const content = document.getElementById('api-help-content');
+    const icon = document.getElementById('api-help-icon');
+    content.classList.toggle('hidden');
+    icon.classList.toggle('rotate-180');
+}
+
+function copyJsExample() {
+    const code = document.getElementById('js-example').textContent;
+    navigator.clipboard.writeText(code).then(() => {
+        alert('Code JavaScript copié dans le presse-papiers !');
+    });
+}
+</script>

@@ -4,12 +4,23 @@ use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 use Livewire\Volt\Volt;
 
+// Route d'accueil - affiche la page de login
 Route::get('/', function () {
-    return view('welcome');
+    /** @var \Illuminate\Contracts\Auth\Guard $guard */
+    $guard = auth();
+    if ($guard->check()) {
+        return redirect()->route('dashboard');
+    }
+    return view('livewire.auth.login');
 })->name('home');
 
+// Redirection de /login vers / pour éviter la confusion
+Route::get('/login', function () {
+    return redirect()->route('home');
+});
+
 // Sprint 3: Routes publiques pour les formulaires et confirmation email
-Route::post('forms/{form}/submit', [\App\Http\Controllers\PublicFormController::class, 'submit'])
+Route::post('forms/{form:uid}/submit', [\App\Http\Controllers\PublicFormController::class, 'submit'])
     ->name('forms.submit');
 
 Route::get('leads/confirm-email/{token}', [\App\Http\Controllers\LeadConfirmationController::class, 'confirm'])
@@ -17,8 +28,10 @@ Route::get('leads/confirm-email/{token}', [\App\Http\Controllers\LeadConfirmatio
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function () {
+        /** @var \Illuminate\Contracts\Auth\Guard $guard */
+        $guard = auth();
         /** @var \App\Models\User|null $user */
-        $user = auth()->user();
+        $user = $guard->user();
 
         // Load role with eager loading to avoid N+1 queries
         $user->loadMissing('role');
@@ -110,6 +123,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('admin.forms.edit');
         Volt::route('admin/forms/{form}/preview', 'admin.forms.preview')
             ->name('admin.forms.preview');
+        Volt::route('admin/forms/{form}/info', 'admin.forms.info')
+            ->name('admin.forms.info');
 
         // Sprint 4: Gestion des leads (Super Admin)
         Volt::route('admin/leads', 'admin.leads')

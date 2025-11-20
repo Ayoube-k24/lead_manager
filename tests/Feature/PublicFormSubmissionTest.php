@@ -101,3 +101,18 @@ test('form without smtp profile cannot be submitted', function () {
 
     $response->assertStatus(400);
 });
+
+test('public submission route uses the form uid', function () {
+    $smtpProfile = SmtpProfile::factory()->create();
+    $emailTemplate = EmailTemplate::factory()->create();
+
+    $form = Form::factory()->create([
+        'is_active' => true,
+        'smtp_profile_id' => $smtpProfile->id,
+        'email_template_id' => $emailTemplate->id,
+    ]);
+
+    $url = route('forms.submit', $form);
+
+    expect($url)->toContain($form->uid);
+});

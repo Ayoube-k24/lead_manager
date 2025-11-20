@@ -5,7 +5,7 @@ use App\Models\Form;
 use App\Models\Role;
 use App\Models\SmtpProfile;
 use App\Models\User;
-use Livewire\Volt\Volt;
+use Livewire\Livewire;
 
 beforeEach(function () {
     require_once __DIR__.'/../../../Sprint1/EnsureMigrationsRun.php';
@@ -22,8 +22,8 @@ beforeEach(function () {
 test('super admin can view edit form page', function () {
     $form = Form::factory()->create();
 
-    Volt::test('admin.forms.edit', ['form' => $form])
-        ->actingAs($this->superAdmin)
+    Livewire::actingAs($this->superAdmin)
+        ->test('admin.forms.edit', ['form' => $form])
         ->assertSee('Modifier le formulaire')
         ->assertSee($form->name);
 });
@@ -47,8 +47,8 @@ test('super admin can update form', function () {
     $smtpProfile = SmtpProfile::factory()->create();
     $emailTemplate = EmailTemplate::factory()->create();
 
-    Volt::test('admin.forms.edit', ['form' => $form])
-        ->actingAs($this->superAdmin)
+    Livewire::actingAs($this->superAdmin)
+        ->test('admin.forms.edit', ['form' => $form])
         ->set('name', 'New Form')
         ->set('description', 'New Description')
         ->set('fields', [
@@ -89,8 +89,8 @@ test('super admin can add and remove fields when editing form', function () {
         ],
     ]);
 
-    Volt::test('admin.forms.edit', ['form' => $form])
-        ->actingAs($this->superAdmin)
+    Livewire::actingAs($this->superAdmin)
+        ->test('admin.forms.edit', ['form' => $form])
         ->call('addField')
         ->assertSet('fields', function ($fields) {
             return count($fields) === 2;
@@ -104,8 +104,8 @@ test('super admin can add and remove fields when editing form', function () {
 test('super admin cannot update form with invalid data', function () {
     $form = Form::factory()->create();
 
-    Volt::test('admin.forms.edit', ['form' => $form])
-        ->actingAs($this->superAdmin)
+    Livewire::actingAs($this->superAdmin)
+        ->test('admin.forms.edit', ['form' => $form])
         ->set('name', '')
         ->set('fields', [])
         ->call('update')

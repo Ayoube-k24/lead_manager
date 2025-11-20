@@ -117,6 +117,13 @@
   - ✅ Relation `belongsTo` avec `EmailTemplate`
   - ✅ Champ `email_template_id` dans la table `forms`
 
+### Identifiant API unique
+
+- ✅ Chaque formulaire dispose maintenant d’un `uid` de **12 caractères** généré automatiquement
+- ✅ L’endpoint public utilise ce `uid` (`POST /forms/{uid}/submit`) pour insérer des leads depuis les landing pages
+- ✅ L’UID et l’URL API sont affichés depuis la page d’édition d’un formulaire pour faciliter les intégrations
+- ✅ Une page « Guide API » détaillée est disponible pour chaque formulaire (explication HTML/JS/cURL)
+
 **Fichiers concernés :**
 - `resources/views/livewire/admin/forms/create.blade.php` (lignes 230-235)
 - `app/Models/Form.php` (méthode `emailTemplate()`)

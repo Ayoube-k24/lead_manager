@@ -213,6 +213,7 @@ new class extends Component {
                         <th class="px-6 py-3 text-left text-sm font-semibold text-neutral-700 dark:text-neutral-300">{{ __('Champs') }}</th>
                         <th class="px-6 py-3 text-left text-sm font-semibold text-neutral-700 dark:text-neutral-300">{{ __('Configuration') }}</th>
                         <th class="px-6 py-3 text-left text-sm font-semibold text-neutral-700 dark:text-neutral-300">{{ __('Statut') }}</th>
+                        <th class="px-6 py-3 text-left text-sm font-semibold text-neutral-700 dark:text-neutral-300">{{ __('API') }}</th>
                         <th class="px-6 py-3 text-right text-sm font-semibold text-neutral-700 dark:text-neutral-300">{{ __('Actions') }}</th>
                     </tr>
                 </thead>
@@ -228,6 +229,9 @@ new class extends Component {
                             </td>
                             <td class="px-6 py-4">
                                 <div class="font-medium">{{ $form->name }}</div>
+                                <div class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                                    <code class="rounded bg-neutral-100 px-1.5 py-0.5 dark:bg-neutral-900">{{ $form->uid }}</code>
+                                </div>
                             </td>
                             <td class="px-6 py-4">
                                 <div class="text-sm text-neutral-600 dark:text-neutral-400">
@@ -262,6 +266,21 @@ new class extends Component {
                                     {{ $form->is_active ? __('Actif') : __('Inactif') }}
                                 </flux:badge>
                             </td>
+                            <td class="px-6 py-4">
+                                @if($form->is_active)
+                                    <flux:button 
+                                        href="{{ route('admin.forms.info', $form) }}" 
+                                        variant="primary" 
+                                        size="sm"
+                                        icon="information-circle"
+                                        wire:navigate
+                                    >
+                                        {{ __('Guide API') }}
+                                    </flux:button>
+                                @else
+                                    <span class="text-xs text-neutral-400">{{ __('Inactif') }}</span>
+                                @endif
+                            </td>
                             <td class="px-6 py-4 text-right">
                                 <flux:dropdown position="bottom" align="end">
                                     <flux:button variant="ghost" size="sm" icon="ellipsis-vertical">
@@ -270,6 +289,13 @@ new class extends Component {
 
                                     <flux:menu>
                                         <flux:menu.radio.group>
+                                            <flux:menu.item 
+                                                href="{{ route('admin.forms.info', $form) }}" 
+                                                icon="information-circle"
+                                                wire:navigate
+                                            >
+                                                {{ __('Guide API') }}
+                                            </flux:menu.item>
                                             <flux:menu.item 
                                                 href="{{ route('admin.forms.preview', $form) }}" 
                                                 icon="eye"
@@ -315,7 +341,7 @@ new class extends Component {
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-6 py-12 text-center">
+                            <td colspan="8" class="px-6 py-12 text-center">
                                 <div class="flex flex-col items-center gap-2">
                                     <svg class="h-12 w-12 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

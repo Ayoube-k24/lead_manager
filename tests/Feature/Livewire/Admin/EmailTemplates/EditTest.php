@@ -3,7 +3,7 @@
 use App\Models\EmailTemplate;
 use App\Models\Role;
 use App\Models\User;
-use Livewire\Volt\Volt;
+use Livewire\Livewire;
 
 beforeEach(function () {
     require_once __DIR__.'/../../../Sprint1/EnsureMigrationsRun.php';
@@ -19,9 +19,9 @@ beforeEach(function () {
 
 test('super admin can view edit email template page', function () {
     $template = EmailTemplate::factory()->create();
-
-    Volt::test('admin.email-templates.edit', ['emailTemplate' => $template])
-        ->actingAs($this->superAdmin)
+    
+    Livewire::actingAs($this->superAdmin)
+        ->test('admin.email-templates.edit', ['emailTemplate' => $template])
         ->assertSee('Modifier le template d\'email')
         ->assertSee($template->name);
 });
@@ -34,8 +34,8 @@ test('super admin can update email template', function () {
         'body_text' => 'Old Text',
     ]);
 
-    Volt::test('admin.email-templates.edit', ['emailTemplate' => $template])
-        ->actingAs($this->superAdmin)
+    Livewire::actingAs($this->superAdmin)
+        ->test('admin.email-templates.edit', ['emailTemplate' => $template])
         ->set('name', 'New Template')
         ->set('subject', 'New Subject')
         ->set('body_html', '<p>New HTML</p>')
@@ -53,8 +53,8 @@ test('super admin can update email template', function () {
 test('super admin can update email template without body_text', function () {
     $template = EmailTemplate::factory()->create();
 
-    Volt::test('admin.email-templates.edit', ['emailTemplate' => $template])
-        ->actingAs($this->superAdmin)
+    Livewire::actingAs($this->superAdmin)
+        ->test('admin.email-templates.edit', ['emailTemplate' => $template])
         ->set('body_text', null)
         ->call('update')
         ->assertRedirect(route('admin.email-templates'));
@@ -66,8 +66,8 @@ test('super admin can update email template without body_text', function () {
 test('super admin cannot update email template with invalid data', function () {
     $template = EmailTemplate::factory()->create();
 
-    Volt::test('admin.email-templates.edit', ['emailTemplate' => $template])
-        ->actingAs($this->superAdmin)
+    Livewire::actingAs($this->superAdmin)
+        ->test('admin.email-templates.edit', ['emailTemplate' => $template])
         ->set('name', '')
         ->set('subject', '')
         ->set('body_html', '')

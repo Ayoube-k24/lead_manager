@@ -5,7 +5,7 @@ use App\Models\Form;
 use App\Models\Role;
 use App\Models\SmtpProfile;
 use App\Models\User;
-use Livewire\Volt\Volt;
+use Livewire\Livewire;
 
 beforeEach(function () {
     require_once __DIR__.'/../../../Sprint1/EnsureMigrationsRun.php';
@@ -23,8 +23,8 @@ test('super admin can create form', function () {
     $smtpProfile = SmtpProfile::factory()->create();
     $emailTemplate = EmailTemplate::factory()->create();
 
-    Volt::test('admin.forms.create')
-        ->actingAs($this->superAdmin)
+    Livewire::actingAs($this->superAdmin)
+        ->test('admin.forms.create')
         ->set('name', 'Test Form')
         ->set('description', 'Test Description')
         ->set('fields', [
@@ -48,8 +48,8 @@ test('super admin can create form', function () {
 });
 
 test('super admin can add and remove form fields', function () {
-    Volt::test('admin.forms.create')
-        ->actingAs($this->superAdmin)
+    Livewire::actingAs($this->superAdmin)
+        ->test('admin.forms.create')
         ->call('addField')
         ->assertSet('fields', function ($fields) {
             return count($fields) === 2;
@@ -61,8 +61,8 @@ test('super admin can add and remove form fields', function () {
 });
 
 test('super admin can add options to select field', function () {
-    Volt::test('admin.forms.create')
-        ->actingAs($this->superAdmin)
+    Livewire::actingAs($this->superAdmin)
+        ->test('admin.forms.create')
         ->set('fields.0.type', 'select')
         ->call('addOption', 0)
         ->assertSet('fields.0.options', function ($options) {
@@ -75,8 +75,8 @@ test('super admin can add options to select field', function () {
 });
 
 test('super admin cannot create form with invalid data', function () {
-    Volt::test('admin.forms.create')
-        ->actingAs($this->superAdmin)
+    Livewire::actingAs($this->superAdmin)
+        ->test('admin.forms.create')
         ->set('name', '')
         ->set('fields', [])
         ->call('store')

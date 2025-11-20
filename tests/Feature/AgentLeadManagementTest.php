@@ -3,11 +3,20 @@
 declare(strict_types=1);
 
 use App\Models\Lead;
+use App\Models\Role;
 use App\Models\User;
 use Livewire\Volt\Volt;
 
+beforeEach(function () {
+    require_once __DIR__.'/Sprint1/EnsureMigrationsRun.php';
+    ensureMigrationsRun();
+});
+
 test('agent can view their assigned leads', function () {
-    $role = \App\Models\Role::where('slug', 'agent')->firstOrFail();
+    $role = Role::firstOrCreate(
+        ['slug' => 'agent'],
+        ['name' => 'Agent', 'slug' => 'agent']
+    );
     $agent = User::factory()->create(['role_id' => $role->id]);
     $lead = Lead::factory()->create(['assigned_to' => $agent->id]);
 
@@ -18,7 +27,10 @@ test('agent can view their assigned leads', function () {
 });
 
 test('agent can view lead details', function () {
-    $role = \App\Models\Role::where('slug', 'agent')->firstOrFail();
+    $role = Role::firstOrCreate(
+        ['slug' => 'agent'],
+        ['name' => 'Agent', 'slug' => 'agent']
+    );
     $agent = User::factory()->create(['role_id' => $role->id]);
     $lead = Lead::factory()->create(['assigned_to' => $agent->id]);
 
@@ -29,7 +41,10 @@ test('agent can view lead details', function () {
 });
 
 test('agent cannot view leads assigned to other agents', function () {
-    $role = \App\Models\Role::where('slug', 'agent')->firstOrFail();
+    $role = Role::firstOrCreate(
+        ['slug' => 'agent'],
+        ['name' => 'Agent', 'slug' => 'agent']
+    );
     $agent = User::factory()->create(['role_id' => $role->id]);
     $otherAgent = User::factory()->create(['role_id' => $role->id]);
     $lead = Lead::factory()->create(['assigned_to' => $otherAgent->id]);
@@ -40,7 +55,10 @@ test('agent cannot view leads assigned to other agents', function () {
 });
 
 test('agent can update lead status after call', function () {
-    $role = \App\Models\Role::where('slug', 'agent')->firstOrFail();
+    $role = Role::firstOrCreate(
+        ['slug' => 'agent'],
+        ['name' => 'Agent', 'slug' => 'agent']
+    );
     $agent = User::factory()->create(['role_id' => $role->id]);
     $lead = Lead::factory()->create([
         'assigned_to' => $agent->id,

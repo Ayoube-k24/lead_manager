@@ -3,7 +3,7 @@
 use App\Models\EmailTemplate;
 use App\Models\Role;
 use App\Models\User;
-use Livewire\Volt\Volt;
+use Livewire\Livewire;
 
 beforeEach(function () {
     require_once __DIR__.'/../../../Sprint1/EnsureMigrationsRun.php';
@@ -18,8 +18,8 @@ beforeEach(function () {
 });
 
 test('super admin can create email template', function () {
-    Volt::test('admin.email-templates.create')
-        ->actingAs($this->superAdmin)
+    Livewire::actingAs($this->superAdmin)
+        ->test('admin.email-templates.create')
         ->set('name', 'Test Template')
         ->set('subject', 'Test Subject')
         ->set('body_html', '<p>Test HTML</p>')
@@ -31,8 +31,8 @@ test('super admin can create email template', function () {
 });
 
 test('super admin cannot create email template with invalid data', function () {
-    Volt::test('admin.email-templates.create')
-        ->actingAs($this->superAdmin)
+    Livewire::actingAs($this->superAdmin)
+        ->test('admin.email-templates.create')
         ->set('name', '')
         ->set('subject', 'Test Subject')
         ->call('store')

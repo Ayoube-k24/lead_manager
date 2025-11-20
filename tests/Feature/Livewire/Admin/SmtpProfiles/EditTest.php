@@ -3,7 +3,7 @@
 use App\Models\Role;
 use App\Models\SmtpProfile;
 use App\Models\User;
-use Livewire\Volt\Volt;
+use Livewire\Livewire;
 
 beforeEach(function () {
     require_once __DIR__.'/../../../Sprint1/EnsureMigrationsRun.php';
@@ -20,8 +20,8 @@ beforeEach(function () {
 test('super admin can view edit smtp profile page', function () {
     $profile = SmtpProfile::factory()->create();
 
-    Volt::test('admin.smtp-profiles.edit', ['smtpProfile' => $profile])
-        ->actingAs($this->superAdmin)
+    Livewire::actingAs($this->superAdmin)
+        ->test('admin.smtp-profiles.edit', ['smtpProfile' => $profile])
         ->assertSee('Modifier le profil SMTP')
         ->assertSee($profile->name);
 });
@@ -33,8 +33,8 @@ test('super admin can update smtp profile', function () {
         'port' => 587,
     ]);
 
-    Volt::test('admin.smtp-profiles.edit', ['smtpProfile' => $profile])
-        ->actingAs($this->superAdmin)
+    Livewire::actingAs($this->superAdmin)
+        ->test('admin.smtp-profiles.edit', ['smtpProfile' => $profile])
         ->set('name', 'New Profile')
         ->set('host', 'new.smtp.com')
         ->set('port', 465)
@@ -59,8 +59,8 @@ test('super admin can update smtp profile without changing password', function (
         'password' => 'old_password',
     ]);
 
-    Volt::test('admin.smtp-profiles.edit', ['smtpProfile' => $profile])
-        ->actingAs($this->superAdmin)
+    Livewire::actingAs($this->superAdmin)
+        ->test('admin.smtp-profiles.edit', ['smtpProfile' => $profile])
         ->set('name', 'Updated Profile')
         ->set('password', '') // Empty password should not update
         ->call('update')
@@ -75,8 +75,8 @@ test('super admin can update smtp profile without changing password', function (
 test('super admin can update smtp profile with new password', function () {
     $profile = SmtpProfile::factory()->create();
 
-    Volt::test('admin.smtp-profiles.edit', ['smtpProfile' => $profile])
-        ->actingAs($this->superAdmin)
+    Livewire::actingAs($this->superAdmin)
+        ->test('admin.smtp-profiles.edit', ['smtpProfile' => $profile])
         ->set('password', 'new_password')
         ->call('update')
         ->assertRedirect(route('admin.smtp-profiles'));
@@ -88,8 +88,8 @@ test('super admin can update smtp profile with new password', function () {
 test('super admin cannot update smtp profile with invalid data', function () {
     $profile = SmtpProfile::factory()->create();
 
-    Volt::test('admin.smtp-profiles.edit', ['smtpProfile' => $profile])
-        ->actingAs($this->superAdmin)
+    Livewire::actingAs($this->superAdmin)
+        ->test('admin.smtp-profiles.edit', ['smtpProfile' => $profile])
         ->set('name', '')
         ->set('host', '')
         ->set('port', 0)

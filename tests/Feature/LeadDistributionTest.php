@@ -8,14 +8,22 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\LeadDistributionService;
 
+beforeEach(function () {
+    require_once __DIR__.'/Sprint1/EnsureMigrationsRun.php';
+    ensureMigrationsRun();
+});
+
 test('round robin distribution assigns leads evenly', function () {
     $callCenter = CallCenter::factory()->create(['distribution_method' => 'round_robin']);
-    $agentRole = Role::where('slug', 'agent')->firstOrFail();
+    $agentRole = Role::firstOrCreate(
+        ['slug' => 'agent'],
+        ['name' => 'Agent', 'slug' => 'agent']
+    );
 
     $agent1 = User::factory()->create(['role_id' => $agentRole->id, 'call_center_id' => $callCenter->id]);
     $agent2 = User::factory()->create(['role_id' => $agentRole->id, 'call_center_id' => $callCenter->id]);
 
-    $service = new LeadDistributionService;
+    $service = app(LeadDistributionService::class);
 
     // Create leads and distribute them
     $lead1 = Lead::factory()->create(['call_center_id' => $callCenter->id, 'status' => 'email_confirmed']);
@@ -32,12 +40,15 @@ test('round robin distribution assigns leads evenly', function () {
 
 test('manual assignment works correctly', function () {
     $callCenter = CallCenter::factory()->create();
-    $agentRole = Role::where('slug', 'agent')->firstOrFail();
+    $agentRole = Role::firstOrCreate(
+        ['slug' => 'agent'],
+        ['name' => 'Agent', 'slug' => 'agent']
+    );
 
     $agent = User::factory()->create(['role_id' => $agentRole->id, 'call_center_id' => $callCenter->id]);
     $lead = Lead::factory()->create(['call_center_id' => $callCenter->id, 'status' => 'email_confirmed']);
 
-    $service = new LeadDistributionService;
+    $service = app(LeadDistributionService::class);
 
     $result = $service->assignToAgent($lead, $agent);
 
@@ -49,12 +60,15 @@ test('manual assignment works correctly', function () {
 test('cannot assign lead to agent from different call center', function () {
     $callCenter1 = CallCenter::factory()->create();
     $callCenter2 = CallCenter::factory()->create();
-    $agentRole = Role::where('slug', 'agent')->firstOrFail();
+    $agentRole = Role::firstOrCreate(
+        ['slug' => 'agent'],
+        ['name' => 'Agent', 'slug' => 'agent']
+    );
 
     $agent = User::factory()->create(['role_id' => $agentRole->id, 'call_center_id' => $callCenter1->id]);
     $lead = Lead::factory()->create(['call_center_id' => $callCenter2->id]);
 
-    $service = new LeadDistributionService;
+    $service = app(LeadDistributionService::class);
 
     $result = $service->assignToAgent($lead, $agent);
 
