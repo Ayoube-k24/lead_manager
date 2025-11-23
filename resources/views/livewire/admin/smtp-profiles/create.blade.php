@@ -2,6 +2,7 @@
 
 use App\Http\Requests\StoreSmtpProfileRequest;
 use App\Models\SmtpProfile;
+use App\Services\SmtpTestService;
 use Livewire\Volt\Component;
 
 new class extends Component {
@@ -14,6 +15,37 @@ new class extends Component {
     public string $from_address = '';
     public ?string $from_name = null;
     public bool $is_active = true;
+    public ?string $testResult = null;
+    public bool $testSuccess = false;
+    public bool $isTesting = false;
+
+    public function testConnection(): void
+    {
+        $this->isTesting = true;
+        $this->testResult = null;
+        $this->testSuccess = false;
+
+        $this->validate([
+            'host' => ['required', 'string', 'max:255'],
+            'port' => ['required', 'integer', 'min:1', 'max:65535'],
+            'encryption' => ['required', 'string'],
+            'username' => ['required', 'string', 'max:255'],
+            'password' => ['required', 'string'],
+        ]);
+
+        $service = new SmtpTestService();
+        $result = $service->testConnection([
+            'host' => $this->host,
+            'port' => $this->port,
+            'encryption' => $this->encryption,
+            'username' => $this->username,
+            'password' => $this->password,
+        ]);
+
+        $this->testSuccess = $result['success'];
+        $this->testResult = $result['message'];
+        $this->isTesting = false;
+    }
 
     public function store(): void
     {
@@ -83,6 +115,49 @@ new class extends Component {
             <div class="space-y-4">
                 <flux:input wire:model.blur="from_address" type="email" :label="__('Adresse email expéditeur')" placeholder="noreply@example.com" required />
                 <flux:input wire:model.blur="from_name" :label="__('Nom de l\'expéditeur')" placeholder="Lead Manager" />
+            </div>
+        </div>
+
+        <!-- Test de connexion -->
+        <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
+            <h2 class="mb-4 text-lg font-semibold">{{ __('Test de connexion SMTP') }}</h2>
+            <p class="mb-4 text-sm text-neutral-600 dark:text-neutral-400">
+                {{ __('Testez la connexion avec le serveur SMTP avant de sauvegarder le profil') }}
+            </p>
+            
+            <div class="space-y-4">
+                <flux:button 
+                    wire:click="testConnection" 
+                    variant="outline" 
+                    wire:loading.attr="disabled"
+                    wire:target="testConnection"
+                >
+                    <span wire:loading.remove wire:target="testConnection">
+                        {{ __('Tester la connexion') }}
+                    </span>
+                    <span wire:loading wire:target="testConnection">
+                        {{ __('Test en cours...') }}
+                    </span>
+                </flux:button>
+
+                @if ($testResult)
+                    <div class="rounded-lg border p-4 {{ $testSuccess ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20' : 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20' }}">
+                        <div class="flex items-start gap-3">
+                            @if ($testSuccess)
+                                <svg class="h-5 w-5 shrink-0 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            @else
+                                <svg class="h-5 w-5 shrink-0 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            @endif
+                            <p class="text-sm {{ $testSuccess ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200' }}">
+                                {{ $testResult }}
+                            </p>
+                        </div>
+                    </div>
+                @endif
             </div>
         </div>
 
