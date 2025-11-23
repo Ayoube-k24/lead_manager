@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Requests\UpdateFormRequest;
+use App\Models\CallCenter;
 use App\Models\EmailTemplate;
 use App\Models\Form;
 use App\Models\SmtpProfile;
@@ -13,6 +14,7 @@ new class extends Component {
     public array $fields = [];
     public ?int $smtp_profile_id = null;
     public ?int $email_template_id = null;
+    public ?int $call_center_id = null;
     public bool $is_active = true;
 
     public function mount(Form $form): void
@@ -23,6 +25,7 @@ new class extends Component {
         $this->fields = $form->fields ?? [];
         $this->smtp_profile_id = $form->smtp_profile_id;
         $this->email_template_id = $form->email_template_id;
+        $this->call_center_id = $form->call_center_id;
         $this->is_active = $form->is_active;
 
         if (empty($this->fields)) {
@@ -89,6 +92,7 @@ new class extends Component {
         return [
             'smtpProfiles' => SmtpProfile::where('is_active', true)->get(),
             'emailTemplates' => EmailTemplate::all(),
+            'callCenters' => CallCenter::where('is_active', true)->orderBy('name')->get(),
         ];
     }
 }; ?>
@@ -308,6 +312,12 @@ new class extends Component {
                     <option value="">{{ __('Aucun') }}</option>
                     @foreach ($emailTemplates as $template)
                         <option value="{{ $template->id }}">{{ $template->name }}</option>
+                    @endforeach
+                </flux:select>
+                <flux:select wire:model="call_center_id" :label="__('Centre d\'appels')" required>
+                    <option value="">{{ __('Sélectionner un centre d\'appels') }}</option>
+                    @foreach ($callCenters as $callCenter)
+                        <option value="{{ $callCenter->id }}">{{ $callCenter->name }}</option>
                     @endforeach
                 </flux:select>
                 <flux:switch wire:model="is_active" :label="__('Formulaire actif')" />

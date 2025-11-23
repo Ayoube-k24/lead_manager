@@ -26,6 +26,7 @@ class Form extends Model
         'fields',
         'smtp_profile_id',
         'email_template_id',
+        'call_center_id',
         'is_active',
     ];
 
@@ -68,6 +69,14 @@ class Form extends Model
     public function emailTemplate(): BelongsTo
     {
         return $this->belongsTo(EmailTemplate::class);
+    }
+
+    /**
+     * Get the call center for this form.
+     */
+    public function callCenter(): BelongsTo
+    {
+        return $this->belongsTo(CallCenter::class);
     }
 
     /**

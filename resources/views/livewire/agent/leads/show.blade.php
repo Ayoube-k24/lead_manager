@@ -7,8 +7,11 @@ use Livewire\Volt\Component;
 new class extends Component
 {
     public Lead $lead;
+
     public string $status = '';
+
     public string $comment = '';
+
     public bool $showModal = false;
 
     public function mount(Lead $lead): void
@@ -26,14 +29,18 @@ new class extends Component
     public function openUpdateModal(): void
     {
         $this->showModal = true;
-        $this->status = $this->lead->status;
+        // Initialiser avec le statut actuel s'il est valide, sinon utiliser 'confirmed' par défaut
+        $validStatuses = ['confirmed', 'rejected', 'callback_pending'];
+        $this->status = in_array($this->lead->status, $validStatuses)
+            ? $this->lead->status
+            : 'confirmed';
         $this->comment = $this->lead->call_comment ?? '';
     }
 
     public function closeModal(): void
     {
         $this->showModal = false;
-        $this->status = $this->lead->status;
+        $this->status = '';
         $this->comment = '';
     }
 
@@ -187,6 +194,7 @@ new class extends Component
             </div>
 
             <flux:select wire:model="status" :label="__('Nouveau statut')" required>
+                <option value="">{{ __('Sélectionner un statut') }}</option>
                 @foreach ($this->statusOptions as $value => $label)
                     <option value="{{ $value }}">{{ $label }}</option>
                 @endforeach

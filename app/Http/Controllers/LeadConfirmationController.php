@@ -17,7 +17,7 @@ class LeadConfirmationController extends Controller
      */
     public function confirm(Request $request, string $token)
     {
-        $lead = Lead::where('email_confirmation_token', $token)->first();
+        $lead = Lead::with(['form', 'callCenter'])->where('email_confirmation_token', $token)->first();
 
         if (! $lead) {
             return view('leads.confirmation-error', [
@@ -37,17 +37,18 @@ class LeadConfirmationController extends Controller
             ]);
         }
 
-        // Confirm the email
+        // Ensure call_center_id is set before confirming email
+        // The Observer will automatically handle distribution when status changes to email_confirmed
+        if (! $lead->call_center_id && $lead->form && $lead->form->call_center_id) {
+            $lead->call_center_id = $lead->form->call_center_id;
+            $lead->saveQuietly(); // Save without triggering observer
+        }
+
+        // Confirm the email - Observer will automatically distribute
         $lead->confirmEmail();
 
-        // Try to automatically distribute the lead to an agent
-        if (! $lead->assigned_to && $lead->call_center_id) {
-            $agent = $this->distributionService->distributeLead($lead);
-            if ($agent) {
-                $this->distributionService->assignToAgent($lead, $agent);
-                $lead->markAsPendingCall();
-            }
-        }
+        // Reload to get the latest state (Observer may have assigned the lead)
+        $lead->refresh();
 
         return view('leads.confirmation-success', [
             'message' => 'Votre email a été confirmé avec succès. Un agent vous contactera prochainement.',

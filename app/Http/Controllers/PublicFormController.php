@@ -20,8 +20,21 @@ class PublicFormController extends Controller
      */
     public function submit(Request $request, Form $form)
     {
+        // Log the submission attempt for security audit
+        \Log::info('Form submission attempt', [
+            'form_id' => $form->id,
+            'form_uid' => $form->uid,
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
+
         // Check if form is active
         if (! $form->is_active) {
+            \Log::warning('Attempt to submit inactive form', [
+                'form_id' => $form->id,
+                'ip' => $request->ip(),
+            ]);
+
             return response()->json([
                 'message' => 'Ce formulaire n\'est pas actif.',
             ], 403);
@@ -38,6 +51,12 @@ class PublicFormController extends Controller
         try {
             $validatedData = $this->formValidationService->validate($form, $request->all());
         } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::warning('Form submission validation failed', [
+                'form_id' => $form->id,
+                'ip' => $request->ip(),
+                'errors' => $e->errors(),
+            ]);
+
             return response()->json([
                 'message' => 'Les données soumises sont invalides.',
                 'errors' => $e->errors(),
@@ -57,13 +76,14 @@ class PublicFormController extends Controller
             ], 422);
         }
 
-        // Create lead
+        // Create lead with call center association
         $lead = $form->leads()->create([
             'data' => $validatedData,
             'email' => $email,
             'status' => 'pending_email',
             'email_confirmation_token' => Str::random(64),
             'email_confirmation_token_expires_at' => now()->addHours(24),
+            'call_center_id' => $form->call_center_id,
         ]);
 
         // Send confirmation email
@@ -72,6 +92,13 @@ class PublicFormController extends Controller
         if (! $emailSent) {
             \Log::warning('Failed to send confirmation email for lead', ['lead_id' => $lead->id]);
         }
+
+        // Log successful submission
+        \Log::info('Form submitted successfully', [
+            'form_id' => $form->id,
+            'lead_id' => $lead->id,
+            'ip' => $request->ip(),
+        ]);
 
         return response()->json([
             'message' => 'Votre formulaire a été soumis avec succès. Veuillez vérifier votre email pour confirmer votre inscription.',

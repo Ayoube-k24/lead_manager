@@ -78,6 +78,13 @@ new class extends Component
             ->get();
     }
 
+    public function getCallCenterProperty()
+    {
+        $user = Auth::user();
+
+        return $user->callCenter;
+    }
+
     public function openAssignModal(int $leadId): void
     {
         $this->selectedLeadId = $leadId;
@@ -226,14 +233,22 @@ new class extends Component
                             </td>
                             <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                                 @if (! $lead->assigned_to && in_array($lead->status, ['email_confirmed', 'pending_call']))
+                                    @php
+                                        $callCenter = $this->callCenter;
+                                        $isManualMode = $callCenter && $callCenter->distribution_method === 'manual';
+                                    @endphp
                                     <div class="flex items-center justify-end gap-2">
-                                        <flux:button
-                                            wire:click="autoAssign({{ $lead->id }})"
-                                            variant="ghost"
-                                            size="sm"
-                                        >
-                                            {{ __('Auto') }}
-                                        </flux:button>
+                                        @if (! $isManualMode)
+                                            {{-- Mode automatique : afficher le bouton Auto pour forcer la distribution --}}
+                                            <flux:button
+                                                wire:click="autoAssign({{ $lead->id }})"
+                                                variant="ghost"
+                                                size="sm"
+                                            >
+                                                {{ __('Auto') }}
+                                            </flux:button>
+                                        @endif
+                                        {{-- Toujours afficher le bouton Assigner pour assignation manuelle --}}
                                         <flux:button
                                             wire:click="openAssignModal({{ $lead->id }})"
                                             variant="primary"
@@ -242,6 +257,10 @@ new class extends Component
                                             {{ __('Assigner') }}
                                         </flux:button>
                                     </div>
+                                @else
+                                    <flux:button href="{{ route('agent.leads.show', $lead) }}" variant="ghost" size="sm" wire:navigate>
+                                        {{ __('Voir') }}
+                                    </flux:button>
                                 @endif
                             </td>
                         </tr>

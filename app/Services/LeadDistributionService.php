@@ -18,29 +18,102 @@ class LeadDistributionService
      */
     public function distributeLead(Lead $lead, ?CallCenter $callCenter = null): ?User
     {
+        \Log::info('Starting lead distribution', [
+            'lead_id' => $lead->id,
+            'lead_call_center_id' => $lead->call_center_id,
+            'lead_status' => $lead->status,
+            'lead_assigned_to' => $lead->assigned_to,
+        ]);
+
         // If call center is not provided, try to get it from the lead
-        if (! $callCenter && $lead->call_center_id) {
-            $callCenter = $lead->callCenter;
+        if (! $callCenter) {
+            // Load form and callCenter relationships if not already loaded
+            if (! $lead->relationLoaded('form')) {
+                $lead->load('form');
+            }
+            if (! $lead->relationLoaded('callCenter')) {
+                $lead->load('callCenter');
+            }
+
+            // Reload lead to ensure we have the latest call_center_id
+            $lead->refresh();
+
+            if ($lead->call_center_id) {
+                $callCenter = $lead->callCenter;
+            } elseif ($lead->form && $lead->form->call_center_id) {
+                // Try to get call center from form
+                \Log::info('Setting call_center_id from form', [
+                    'lead_id' => $lead->id,
+                    'form_id' => $lead->form->id,
+                    'form_call_center_id' => $lead->form->call_center_id,
+                ]);
+                $lead->call_center_id = $lead->form->call_center_id;
+                $lead->save();
+                $lead->refresh();
+                $lead->load('callCenter');
+                $callCenter = $lead->callCenter;
+            }
         }
 
         if (! $callCenter) {
+            \Log::warning('Cannot distribute lead: no call center associated', [
+                'lead_id' => $lead->id,
+                'form_id' => $lead->form_id,
+                'form_call_center_id' => $lead->form?->call_center_id,
+            ]);
+
             return null;
         }
+
+        \Log::info('Call center found for distribution', [
+            'lead_id' => $lead->id,
+            'call_center_id' => $callCenter->id,
+            'call_center_name' => $callCenter->name,
+            'distribution_method' => $callCenter->distribution_method,
+        ]);
 
         // Get active agents for this call center
         $agents = $this->getActiveAgents($callCenter);
 
         if ($agents->isEmpty()) {
+            \Log::warning('Cannot distribute lead: no active agents found', [
+                'lead_id' => $lead->id,
+                'call_center_id' => $callCenter->id,
+            ]);
+
             return null;
         }
 
+        \Log::info('Active agents found', [
+            'lead_id' => $lead->id,
+            'call_center_id' => $callCenter->id,
+            'agents_count' => $agents->count(),
+            'agent_ids' => $agents->pluck('id')->toArray(),
+        ]);
+
         // Distribute based on method
-        return match ($callCenter->distribution_method) {
+        $selectedAgent = match ($callCenter->distribution_method) {
             'round_robin' => $this->distributeRoundRobin($lead, $agents),
             'weighted' => $this->distributeWeighted($lead, $agents),
             'manual' => null, // Manual distribution, don't auto-assign
             default => $this->distributeRoundRobin($lead, $agents),
         };
+
+        if ($selectedAgent) {
+            \Log::info('Agent selected for distribution', [
+                'lead_id' => $lead->id,
+                'agent_id' => $selectedAgent->id,
+                'agent_name' => $selectedAgent->name,
+                'distribution_method' => $callCenter->distribution_method,
+            ]);
+        } else {
+            \Log::warning('No agent selected for distribution', [
+                'lead_id' => $lead->id,
+                'distribution_method' => $callCenter->distribution_method,
+            ]);
+        }
+
+        return $selectedAgent;
     }
 
     /**
@@ -50,7 +123,9 @@ class LeadDistributionService
     {
         return User::where('call_center_id', $callCenter->id)
             ->whereHas('role', fn ($q) => $q->where('slug', 'agent'))
-            ->get();
+            ->with('role')
+            ->get()
+            ->filter(fn ($user) => $user->isAgent());
     }
 
     /**
@@ -152,13 +227,34 @@ class LeadDistributionService
      */
     public function assignToAgent(Lead $lead, User $agent): bool
     {
+        // Reload lead to ensure we have fresh data
+        $lead->refresh();
+
+        // Load agent role if not already loaded
+        if (! $agent->relationLoaded('role')) {
+            $agent->load('role');
+        }
+
         // Verify agent belongs to the same call center as the lead
         if ($lead->call_center_id && $agent->call_center_id !== $lead->call_center_id) {
+            \Log::warning('Cannot assign lead: agent belongs to different call center', [
+                'lead_id' => $lead->id,
+                'lead_call_center_id' => $lead->call_center_id,
+                'agent_id' => $agent->id,
+                'agent_call_center_id' => $agent->call_center_id,
+            ]);
+
             return false;
         }
 
         // Verify agent is actually an agent
         if (! $agent->isAgent()) {
+            \Log::warning('Cannot assign lead: user is not an agent', [
+                'lead_id' => $lead->id,
+                'user_id' => $agent->id,
+                'user_role' => $agent->role?->slug,
+            ]);
+
             return false;
         }
 
@@ -169,12 +265,51 @@ class LeadDistributionService
 
         $saved = $lead->save();
 
+        \Log::info('Lead save attempt', [
+            'lead_id' => $lead->id,
+            'assigned_to' => $lead->assigned_to,
+            'call_center_id' => $lead->call_center_id,
+            'saved' => $saved,
+            'lead_dirty' => $lead->isDirty(),
+            'lead_was_changed' => $lead->wasChanged(),
+        ]);
+
+        // Reload to verify
+        $lead->refresh();
+
         if ($saved) {
             // Log the assignment
-            $this->auditService->logLeadAssigned($lead, $agent);
+            try {
+                $this->auditService->logLeadAssigned($lead, $agent);
+            } catch (\Exception $e) {
+                \Log::error('Failed to log lead assignment', [
+                    'lead_id' => $lead->id,
+                    'agent_id' => $agent->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             // Send notification to agent
-            $agent->notify(new \App\Notifications\LeadAssignedNotification($lead));
+            try {
+                $agent->notify(new \App\Notifications\LeadAssignedNotification($lead));
+            } catch (\Exception $e) {
+                \Log::error('Failed to send notification to agent', [
+                    'lead_id' => $lead->id,
+                    'agent_id' => $agent->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            \Log::info('Lead assigned to agent successfully', [
+                'lead_id' => $lead->id,
+                'agent_id' => $agent->id,
+                'call_center_id' => $lead->call_center_id,
+            ]);
+        } else {
+            \Log::error('Failed to save lead assignment', [
+                'lead_id' => $lead->id,
+                'agent_id' => $agent->id,
+            ]);
         }
 
         return $saved;

@@ -11,16 +11,18 @@ Route::get('/', function () {
     if ($guard->check()) {
         return redirect()->route('dashboard');
     }
+
     return view('livewire.auth.login');
 })->name('home');
 
 // Redirection de /login vers / pour éviter la confusion
 Route::get('/login', function () {
     return redirect()->route('home');
-});
+})->name('login');
 
 // Sprint 3: Routes publiques pour les formulaires et confirmation email
 Route::post('forms/{form:uid}/submit', [\App\Http\Controllers\PublicFormController::class, 'submit'])
+    ->middleware('throttle:form-submission')
     ->name('forms.submit');
 
 Route::get('leads/confirm-email/{token}', [\App\Http\Controllers\LeadConfirmationController::class, 'confirm'])

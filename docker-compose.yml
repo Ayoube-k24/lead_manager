@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lead-manager-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=${APP_ENV:-production}
+      - APP_DEBUG=${APP_DEBUG:-false}
+      - DB_CONNECTION=${DB_CONNECTION:-mysql}
+      - DB_HOST=${DB_HOST:-db}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_DATABASE=${DB_DATABASE:-lead_manager}
+      - DB_USERNAME=${DB_USERNAME:-lead_manager}
+      - DB_PASSWORD=${DB_PASSWORD:-password}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+    volumes:
+      - ./storage:/var/www/html/storage
+      - ./bootstrap/cache:/var/www/html/bootstrap/cache
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+    networks:
+      - lead-manager-network
+
+  db:
+    image: mysql:8.0
+    container_name: lead-manager-db
+    restart: unless-stopped
+    environment:
+      - MYSQL_DATABASE=${DB_DATABASE:-lead_manager}
+      - MYSQL_USER=${DB_USERNAME:-lead_manager}
+      - MYSQL_PASSWORD=${DB_PASSWORD:-password}
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-rootpassword}
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - lead-manager-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: lead-manager-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - lead-manager-network
+
+volumes:
+  db_data:
+  redis_data:
+
+networks:
+  lead-manager-network:
+    driver: bridge
+

@@ -100,7 +100,15 @@ class Lead extends Model
     {
         $this->email_confirmed_at = now();
         $this->status = 'email_confirmed';
+        // Use save() to trigger Observer
         $this->save();
+
+        \Log::info('Lead email confirmed via confirmEmail()', [
+            'lead_id' => $this->id,
+            'status' => $this->status,
+            'call_center_id' => $this->call_center_id,
+            'assigned_to' => $this->assigned_to,
+        ]);
     }
 
     /**

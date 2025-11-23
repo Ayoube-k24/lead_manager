@@ -35,6 +35,7 @@ class UpdateFormRequest extends FormRequest
             'fields.*.options' => ['nullable', 'array', 'required_if:fields.*.type,select'],
             'smtp_profile_id' => ['nullable', 'exists:smtp_profiles,id'],
             'email_template_id' => ['nullable', 'exists:email_templates,id'],
+            'call_center_id' => ['required', 'exists:call_centers,id'],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }
