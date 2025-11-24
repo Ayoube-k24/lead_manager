@@ -72,15 +72,20 @@ class LeadObserver
 
             // Only distribute if we have a call center
             if ($lead->call_center_id) {
-                // Load call center to check distribution method
-                if (! $lead->relationLoaded('callCenter')) {
-                    $lead->load('callCenter');
+                // Always reload call center from database to get latest distribution_method
+                $callCenter = \App\Models\CallCenter::find($lead->call_center_id);
+
+                if (! $callCenter) {
+                    Log::warning('Observer: Call center not found', [
+                        'lead_id' => $lead->id,
+                        'call_center_id' => $lead->call_center_id,
+                    ]);
+
+                    return;
                 }
 
-                $callCenter = $lead->callCenter;
-
                 // Skip automatic distribution if mode is manual
-                if ($callCenter && $callCenter->distribution_method === 'manual') {
+                if ($callCenter->distribution_method === 'manual') {
                     Log::info('Observer: Skipping automatic distribution (manual mode)', [
                         'lead_id' => $lead->id,
                         'call_center_id' => $lead->call_center_id,

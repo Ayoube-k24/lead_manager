@@ -39,7 +39,8 @@ class LeadDistributionService
             $lead->refresh();
 
             if ($lead->call_center_id) {
-                $callCenter = $lead->callCenter;
+                // Always reload call center from database to get latest distribution_method
+                $callCenter = CallCenter::find($lead->call_center_id);
             } elseif ($lead->form && $lead->form->call_center_id) {
                 // Try to get call center from form
                 \Log::info('Setting call_center_id from form', [
@@ -50,9 +51,12 @@ class LeadDistributionService
                 $lead->call_center_id = $lead->form->call_center_id;
                 $lead->save();
                 $lead->refresh();
-                $lead->load('callCenter');
-                $callCenter = $lead->callCenter;
+                // Always reload call center from database to get latest distribution_method
+                $callCenter = CallCenter::find($lead->call_center_id);
             }
+        } else {
+            // If call center is provided, refresh it to ensure we have latest data
+            $callCenter->refresh();
         }
 
         if (! $callCenter) {
