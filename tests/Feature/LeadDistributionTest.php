@@ -255,3 +255,268 @@ test('distributeLead works for weighted mode', function () {
     expect($assignedAgent)->not->toBeNull()
         ->and($assignedAgent->id)->toBe($agent->id);
 });
+
+test('round_robin distributes leads evenly across multiple agents', function () {
+    $callCenter = CallCenter::factory()->create(['distribution_method' => 'round_robin']);
+    $agentRole = Role::firstOrCreate(
+        ['slug' => 'agent'],
+        ['name' => 'Agent', 'slug' => 'agent']
+    );
+
+    $agent1 = User::factory()->create(['role_id' => $agentRole->id, 'call_center_id' => $callCenter->id]);
+    $agent2 = User::factory()->create(['role_id' => $agentRole->id, 'call_center_id' => $callCenter->id]);
+    $agent3 = User::factory()->create(['role_id' => $agentRole->id, 'call_center_id' => $callCenter->id]);
+
+    $service = app(LeadDistributionService::class);
+
+    // Distribute 6 leads - should be evenly distributed (2 each)
+    $leads = [];
+    $assignments = [];
+
+    for ($i = 0; $i < 6; $i++) {
+        $lead = Lead::factory()->create([
+            'call_center_id' => $callCenter->id,
+            'status' => 'email_confirmed',
+            'assigned_to' => null,
+        ]);
+
+        $assignedAgent = $service->distributeLead($lead);
+        expect($assignedAgent)->not->toBeNull();
+
+        if ($assignedAgent) {
+            $service->assignToAgent($lead, $assignedAgent);
+            $assignments[] = $assignedAgent->id;
+        }
+    }
+
+    // Count assignments per agent
+    $agent1Count = count(array_filter($assignments, fn ($id) => $id === $agent1->id));
+    $agent2Count = count(array_filter($assignments, fn ($id) => $id === $agent2->id));
+    $agent3Count = count(array_filter($assignments, fn ($id) => $id === $agent3->id));
+
+    // Each agent should have at least 1 lead (with 6 leads and 3 agents, distribution should be relatively even)
+    expect($agent1Count)->toBeGreaterThan(0)
+        ->and($agent2Count)->toBeGreaterThan(0)
+        ->and($agent3Count)->toBeGreaterThan(0)
+        ->and($agent1Count + $agent2Count + $agent3Count)->toBe(6);
+});
+
+test('round_robin prefers agent with fewer pending leads', function () {
+    $callCenter = CallCenter::factory()->create(['distribution_method' => 'round_robin']);
+    $agentRole = Role::firstOrCreate(
+        ['slug' => 'agent'],
+        ['name' => 'Agent', 'slug' => 'agent']
+    );
+
+    $agent1 = User::factory()->create(['role_id' => $agentRole->id, 'call_center_id' => $callCenter->id]);
+    $agent2 = User::factory()->create(['role_id' => $agentRole->id, 'call_center_id' => $callCenter->id]);
+
+    // Give agent1 some pending leads
+    Lead::factory()->count(3)->create([
+        'call_center_id' => $callCenter->id,
+        'assigned_to' => $agent1->id,
+        'status' => 'pending_call',
+    ]);
+
+    // agent2 has no leads
+    $service = app(LeadDistributionService::class);
+
+    $newLead = Lead::factory()->create([
+        'call_center_id' => $callCenter->id,
+        'status' => 'email_confirmed',
+        'assigned_to' => null,
+    ]);
+
+    $assignedAgent = $service->distributeLead($newLead);
+
+    // Should assign to agent2 (has fewer leads)
+    expect($assignedAgent)->not->toBeNull()
+        ->and($assignedAgent->id)->toBe($agent2->id);
+});
+
+test('weighted distribution prefers agent with lower performance score', function () {
+    $callCenter = CallCenter::factory()->create(['distribution_method' => 'weighted']);
+    $agentRole = Role::firstOrCreate(
+        ['slug' => 'agent'],
+        ['name' => 'Agent', 'slug' => 'agent']
+    );
+
+    $agent1 = User::factory()->create(['role_id' => $agentRole->id, 'call_center_id' => $callCenter->id]);
+    $agent2 = User::factory()->create(['role_id' => $agentRole->id, 'call_center_id' => $callCenter->id]);
+
+    // Agent1 has high performance (5 confirmed out of 10 total = 0.5 score)
+    Lead::factory()->count(5)->create([
+        'call_center_id' => $callCenter->id,
+        'assigned_to' => $agent1->id,
+        'status' => 'confirmed',
+    ]);
+    Lead::factory()->count(5)->create([
+        'call_center_id' => $callCenter->id,
+        'assigned_to' => $agent1->id,
+        'status' => 'rejected',
+    ]);
+
+    // Agent2 has lower performance (2 confirmed out of 10 total = 0.2 score)
+    Lead::factory()->count(2)->create([
+        'call_center_id' => $callCenter->id,
+        'assigned_to' => $agent2->id,
+        'status' => 'confirmed',
+    ]);
+    Lead::factory()->count(8)->create([
+        'call_center_id' => $callCenter->id,
+        'assigned_to' => $agent2->id,
+        'status' => 'rejected',
+    ]);
+
+    $service = app(LeadDistributionService::class);
+
+    $newLead = Lead::factory()->create([
+        'call_center_id' => $callCenter->id,
+        'status' => 'email_confirmed',
+        'assigned_to' => null,
+    ]);
+
+    $assignedAgent = $service->distributeLead($newLead);
+
+    // Should assign to agent2 (lower performance score, needs more leads)
+    expect($assignedAgent)->not->toBeNull()
+        ->and($assignedAgent->id)->toBe($agent2->id);
+});
+
+test('weighted distribution considers workload when scores are similar', function () {
+    $callCenter = CallCenter::factory()->create(['distribution_method' => 'weighted']);
+    $agentRole = Role::firstOrCreate(
+        ['slug' => 'agent'],
+        ['name' => 'Agent', 'slug' => 'agent']
+    );
+
+    $agent1 = User::factory()->create(['role_id' => $agentRole->id, 'call_center_id' => $callCenter->id]);
+    $agent2 = User::factory()->create(['role_id' => $agentRole->id, 'call_center_id' => $callCenter->id]);
+
+    // Both agents have same performance (no leads = 0.5 default score)
+    // But agent1 has more pending workload
+    Lead::factory()->count(3)->create([
+        'call_center_id' => $callCenter->id,
+        'assigned_to' => $agent1->id,
+        'status' => 'pending_call',
+    ]);
+
+    $service = app(LeadDistributionService::class);
+
+    $newLead = Lead::factory()->create([
+        'call_center_id' => $callCenter->id,
+        'status' => 'email_confirmed',
+        'assigned_to' => null,
+    ]);
+
+    $assignedAgent = $service->distributeLead($newLead);
+
+    // Should assign to agent2 (same score but lower workload)
+    expect($assignedAgent)->not->toBeNull()
+        ->and($assignedAgent->id)->toBe($agent2->id);
+});
+
+test('distribution method is correctly respected in round_robin mode', function () {
+    $callCenter = CallCenter::factory()->create(['distribution_method' => 'round_robin']);
+    $agentRole = Role::firstOrCreate(
+        ['slug' => 'agent'],
+        ['name' => 'Agent', 'slug' => 'agent']
+    );
+
+    $agent1 = User::factory()->create(['role_id' => $agentRole->id, 'call_center_id' => $callCenter->id]);
+    $agent2 = User::factory()->create(['role_id' => $agentRole->id, 'call_center_id' => $callCenter->id]);
+
+    // Create leads with different statuses to test round_robin logic
+    Lead::factory()->count(2)->create([
+        'call_center_id' => $callCenter->id,
+        'assigned_to' => $agent1->id,
+        'status' => 'pending_call',
+    ]);
+
+    $service = app(LeadDistributionService::class);
+
+    $newLead = Lead::factory()->create([
+        'call_center_id' => $callCenter->id,
+        'status' => 'email_confirmed',
+        'assigned_to' => null,
+    ]);
+
+    $assignedAgent = $service->distributeLead($newLead);
+
+    // Round robin should assign to agent2 (has fewer pending leads)
+    expect($assignedAgent)->not->toBeNull()
+        ->and($assignedAgent->id)->toBe($agent2->id);
+});
+
+test('distribution method is correctly respected in weighted mode', function () {
+    $callCenter = CallCenter::factory()->create(['distribution_method' => 'weighted']);
+    $agentRole = Role::firstOrCreate(
+        ['slug' => 'agent'],
+        ['name' => 'Agent', 'slug' => 'agent']
+    );
+
+    $agent1 = User::factory()->create(['role_id' => $agentRole->id, 'call_center_id' => $callCenter->id]);
+    $agent2 = User::factory()->create(['role_id' => $agentRole->id, 'call_center_id' => $callCenter->id]);
+
+    // Agent1 has better performance
+    Lead::factory()->count(8)->create([
+        'call_center_id' => $callCenter->id,
+        'assigned_to' => $agent1->id,
+        'status' => 'confirmed',
+    ]);
+    Lead::factory()->count(2)->create([
+        'call_center_id' => $callCenter->id,
+        'assigned_to' => $agent1->id,
+        'status' => 'rejected',
+    ]);
+
+    // Agent2 has worse performance
+    Lead::factory()->count(3)->create([
+        'call_center_id' => $callCenter->id,
+        'assigned_to' => $agent2->id,
+        'status' => 'confirmed',
+    ]);
+    Lead::factory()->count(7)->create([
+        'call_center_id' => $callCenter->id,
+        'assigned_to' => $agent2->id,
+        'status' => 'rejected',
+    ]);
+
+    $service = app(LeadDistributionService::class);
+
+    $newLead = Lead::factory()->create([
+        'call_center_id' => $callCenter->id,
+        'status' => 'email_confirmed',
+        'assigned_to' => null,
+    ]);
+
+    $assignedAgent = $service->distributeLead($newLead);
+
+    // Weighted should assign to agent2 (lower performance score)
+    expect($assignedAgent)->not->toBeNull()
+        ->and($assignedAgent->id)->toBe($agent2->id);
+});
+
+test('manual mode does not auto-distribute even when agents are available', function () {
+    $callCenter = CallCenter::factory()->create(['distribution_method' => 'manual']);
+    $agentRole = Role::firstOrCreate(
+        ['slug' => 'agent'],
+        ['name' => 'Agent', 'slug' => 'agent']
+    );
+
+    $agent = User::factory()->create(['role_id' => $agentRole->id, 'call_center_id' => $callCenter->id]);
+    $lead = Lead::factory()->create([
+        'call_center_id' => $callCenter->id,
+        'status' => 'email_confirmed',
+        'assigned_to' => null,
+    ]);
+
+    $service = app(LeadDistributionService::class);
+
+    $assignedAgent = $service->distributeLead($lead);
+
+    // Should return null in manual mode
+    expect($assignedAgent)->toBeNull();
+    $lead->refresh();
+    expect($lead->assigned_to)->toBeNull();
+});

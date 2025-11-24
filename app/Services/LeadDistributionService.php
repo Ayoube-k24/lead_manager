@@ -133,9 +133,21 @@ class LeadDistributionService
      */
     protected function distributeRoundRobin(Lead $lead, $agents): ?User
     {
-        // Get the agent with the least number of pending leads
+        // Get the call center ID from the lead
+        $callCenterId = $lead->call_center_id;
+
+        if (! $callCenterId) {
+            \Log::warning('Cannot distribute round-robin: lead has no call_center_id', [
+                'lead_id' => $lead->id,
+            ]);
+
+            return null;
+        }
+
+        // Get the agent with the least number of pending leads for THIS call center
         $agentCounts = DB::table('leads')
             ->select('assigned_to', DB::raw('COUNT(*) as lead_count'))
+            ->where('call_center_id', $callCenterId)
             ->whereIn('assigned_to', $agents->pluck('id'))
             ->whereIn('status', ['pending_call', 'email_confirmed', 'callback_pending'])
             ->groupBy('assigned_to')
@@ -155,13 +167,17 @@ class LeadDistributionService
         if ($availableAgents->count() > 1) {
             $lastAssignments = DB::table('leads')
                 ->select('assigned_to', DB::raw('MAX(updated_at) as last_assigned'))
+                ->where('call_center_id', $callCenterId)
                 ->whereIn('assigned_to', $availableAgents->pluck('id'))
                 ->groupBy('assigned_to')
                 ->get()
                 ->keyBy('assigned_to');
 
+            // Sort by last assignment (oldest first), then by ID for deterministic selection
             return $availableAgents->sortBy(function ($agent) use ($lastAssignments) {
-                return $lastAssignments->get($agent->id)?->last_assigned ?? '1970-01-01';
+                $lastAssigned = $lastAssignments->get($agent->id)?->last_assigned ?? '1970-01-01';
+
+                return $lastAssigned.'_'.$agent->id;
             })->first();
         }
 
@@ -173,9 +189,20 @@ class LeadDistributionService
      */
     protected function distributeWeighted(Lead $lead, $agents): ?User
     {
-        // Calculate performance score for each agent
-        $scores = $agents->mapWithKeys(function ($agent) {
-            $stats = $this->calculateAgentStats($agent);
+        // Get the call center ID from the lead
+        $callCenterId = $lead->call_center_id;
+
+        if (! $callCenterId) {
+            \Log::warning('Cannot distribute weighted: lead has no call_center_id', [
+                'lead_id' => $lead->id,
+            ]);
+
+            return null;
+        }
+
+        // Calculate performance score for each agent (only for THIS call center)
+        $scores = $agents->mapWithKeys(function ($agent) use ($callCenterId) {
+            $stats = $this->calculateAgentStats($agent, $callCenterId);
 
             // Performance score: confirmed leads / total leads (higher is better)
             // If no leads, give a default score of 0.5
@@ -187,32 +214,41 @@ class LeadDistributionService
         });
 
         // Distribute to agent with lowest score (they need more leads to improve)
-        // But also consider current workload
+        // But also consider current workload for THIS call center
         $workloads = DB::table('leads')
             ->select('assigned_to', DB::raw('COUNT(*) as pending_count'))
+            ->where('call_center_id', $callCenterId)
             ->whereIn('assigned_to', $agents->pluck('id'))
             ->whereIn('status', ['pending_call', 'email_confirmed', 'callback_pending'])
             ->groupBy('assigned_to')
             ->get()
             ->keyBy('assigned_to');
 
+        // Sort by combined score and workload, then by ID for deterministic selection
         return $agents->sortBy(function ($agent) use ($scores, $workloads) {
             $score = $scores->get($agent->id) ?? 0.5;
             $workload = $workloads->get($agent->id)?->pending_count ?? 0;
 
             // Combine score and workload (lower score + lower workload = higher priority)
-            return ($score * 100) + $workload;
+            return (($score * 100) + $workload).'_'.$agent->id;
         })->first();
     }
 
     /**
-     * Calculate agent statistics.
+     * Calculate agent statistics for a specific call center.
      *
      * @return array{total: int, confirmed: int, rejected: int, pending: int}
      */
-    protected function calculateAgentStats(User $agent): array
+    protected function calculateAgentStats(User $agent, ?int $callCenterId = null): array
     {
-        $leads = Lead::where('assigned_to', $agent->id)->get();
+        $query = Lead::where('assigned_to', $agent->id);
+
+        // Filter by call center if provided
+        if ($callCenterId) {
+            $query->where('call_center_id', $callCenterId);
+        }
+
+        $leads = $query->get();
 
         return [
             'total' => $leads->count(),
