@@ -45,6 +45,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return match ($user->role->slug) {
             'super_admin' => redirect()->route('dashboard.admin'),
             'call_center_owner' => redirect()->route('dashboard.owner'),
+            'supervisor' => redirect()->route('dashboard.supervisor'),
             'agent' => redirect()->route('dashboard.agent'),
             default => redirect()->route('profile.edit'),
         };
@@ -58,6 +59,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('role:call_center_owner')
         ->name('dashboard.owner');
 
+    Volt::route('supervisor/dashboard', 'dashboard.supervisor')
+        ->middleware('role:supervisor')
+        ->name('dashboard.supervisor');
+
     Volt::route('agent/dashboard', 'dashboard.agent')
         ->middleware('role:agent')
         ->name('dashboard.agent');
@@ -68,6 +73,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('agent.leads');
         Volt::route('agent/leads/{lead}', 'agent.leads.show')
             ->name('agent.leads.show');
+    });
+
+    // Gestion des agents par les superviseurs
+    Route::middleware('role:supervisor')->group(function () {
+        Volt::route('supervisor/agents', 'supervisor.agents')
+            ->name('supervisor.agents');
+        Volt::route('supervisor/agents/{user}/stats', 'supervisor.agents.stats')
+            ->name('supervisor.agents.stats');
+        Volt::route('supervisor/leads', 'supervisor.leads')
+            ->name('supervisor.leads');
+        Volt::route('supervisor/statistics', 'supervisor.statistics')
+            ->name('supervisor.statistics');
     });
 
     // Sprint 4: Gestion des agents par les propriétaires de centres d'appels

@@ -55,6 +55,39 @@ test('call center owner is redirected to /owner/dashboard after login', function
     $this->assertAuthenticatedAs($owner);
 });
 
+test('supervisor is redirected to /supervisor/dashboard after login', function () {
+    $supervisorRole = Role::where('slug', 'supervisor')->firstOrFail();
+    $ownerRole = Role::where('slug', 'call_center_owner')->firstOrFail();
+
+    $owner = User::factory()->withoutTwoFactor()->create([
+        'role_id' => $ownerRole->id,
+        'password' => Hash::make('password'),
+        'email_verified_at' => now(),
+    ]);
+
+    $callCenter = CallCenter::firstOrCreate(['owner_id' => $owner->id], [
+        'name' => 'Test Call Center',
+        'description' => 'Test',
+        'distribution_method' => 'round_robin',
+        'is_active' => true,
+    ]);
+
+    $supervisor = User::factory()->withoutTwoFactor()->create([
+        'role_id' => $supervisorRole->id,
+        'call_center_id' => $callCenter->id,
+        'password' => Hash::make('password'),
+        'email_verified_at' => now(),
+    ]);
+
+    $response = $this->post(route('login.store'), [
+        'email' => $supervisor->email,
+        'password' => 'password',
+    ]);
+
+    $response->assertRedirect(route('dashboard.supervisor'));
+    $this->assertAuthenticatedAs($supervisor);
+});
+
 test('agent is redirected to /agent/dashboard after login', function () {
     $ownerRole = Role::where('slug', 'call_center_owner')->firstOrFail();
     $agentRole = Role::where('slug', 'agent')->firstOrFail();
@@ -119,6 +152,60 @@ test('call center owner cannot access /admin/dashboard', function () {
     $owner->update(['call_center_id' => $callCenter->id]);
 
     $response = $this->actingAs($owner)->get(route('dashboard.admin'));
+
+    $response->assertForbidden();
+});
+
+test('supervisor can access /supervisor/dashboard', function () {
+    $supervisorRole = Role::where('slug', 'supervisor')->firstOrFail();
+    $ownerRole = Role::where('slug', 'call_center_owner')->firstOrFail();
+
+    $owner = User::factory()->create([
+        'role_id' => $ownerRole->id,
+        'email_verified_at' => now(),
+    ]);
+
+    $callCenter = CallCenter::firstOrCreate(['owner_id' => $owner->id], [
+        'name' => 'Test Call Center',
+        'description' => 'Test',
+        'distribution_method' => 'round_robin',
+        'is_active' => true,
+    ]);
+
+    $supervisor = User::factory()->create([
+        'role_id' => $supervisorRole->id,
+        'call_center_id' => $callCenter->id,
+        'email_verified_at' => now(),
+    ]);
+
+    $response = $this->actingAs($supervisor)->get(route('dashboard.supervisor'));
+
+    $response->assertSuccessful();
+});
+
+test('supervisor cannot access /admin/dashboard', function () {
+    $supervisorRole = Role::where('slug', 'supervisor')->firstOrFail();
+    $ownerRole = Role::where('slug', 'call_center_owner')->firstOrFail();
+
+    $owner = User::factory()->create([
+        'role_id' => $ownerRole->id,
+        'email_verified_at' => now(),
+    ]);
+
+    $callCenter = CallCenter::firstOrCreate(['owner_id' => $owner->id], [
+        'name' => 'Test Call Center',
+        'description' => 'Test',
+        'distribution_method' => 'round_robin',
+        'is_active' => true,
+    ]);
+
+    $supervisor = User::factory()->create([
+        'role_id' => $supervisorRole->id,
+        'call_center_id' => $callCenter->id,
+        'email_verified_at' => now(),
+    ]);
+
+    $response = $this->actingAs($supervisor)->get(route('dashboard.admin'));
 
     $response->assertForbidden();
 });

@@ -12,6 +12,17 @@ new class extends Component
     public string $email = '';
     public string $password = '';
     public string $password_confirmation = '';
+    public ?int $supervisor_id = null;
+
+    public function getSupervisorsProperty()
+    {
+        $owner = Auth::user();
+        return User::where('call_center_id', $owner->call_center_id)
+            ->whereHas('role', fn($q) => $q->where('slug', 'supervisor'))
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+    }
 
     public function store(): void
     {
@@ -19,6 +30,7 @@ new class extends Component
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'supervisor_id' => ['nullable', 'exists:users,id'],
         ]);
 
         $user = Auth::user();
@@ -42,6 +54,7 @@ new class extends Component
             'password' => Hash::make($validated['password']),
             'role_id' => $agentRole->id,
             'call_center_id' => $callCenter->id,
+            'supervisor_id' => $validated['supervisor_id'] ?? null,
             'email_verified_at' => now(),
             'is_active' => true,
         ]);
@@ -74,6 +87,12 @@ new class extends Component
                 <flux:input wire:model.blur="email" type="email" :label="__('Email')" required />
                 <flux:input wire:model.blur="password" type="password" :label="__('Mot de passe')" required />
                 <flux:input wire:model.blur="password_confirmation" type="password" :label="__('Confirmer le mot de passe')" required />
+                <flux:select wire:model.blur="supervisor_id" :label="__('Superviseur (optionnel)')">
+                    <option value="">{{ __('Aucun superviseur') }}</option>
+                    @foreach($this->supervisors as $supervisor)
+                        <option value="{{ $supervisor->id }}">{{ $supervisor->name }}</option>
+                    @endforeach
+                </flux:select>
             </div>
         </div>
 

@@ -13,6 +13,7 @@ new class extends Component
     public string $password = '';
     public string $password_confirmation = '';
     public bool $is_active = true;
+    public ?int $supervisor_id = null;
 
     public function mount(User $user): void
     {
@@ -25,6 +26,17 @@ new class extends Component
         $this->name = $user->name;
         $this->email = $user->email;
         $this->is_active = (bool) $user->is_active;
+        $this->supervisor_id = $user->supervisor_id;
+    }
+
+    public function getSupervisorsProperty()
+    {
+        $owner = Auth::user();
+        return User::where('call_center_id', $owner->call_center_id)
+            ->whereHas('role', fn($q) => $q->where('slug', 'supervisor'))
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
     }
 
     public function update(): void
@@ -33,6 +45,7 @@ new class extends Component
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,'.$this->agent->id],
             'is_active' => ['boolean'],
+            'supervisor_id' => ['nullable', 'exists:users,id'],
         ];
 
         if (! empty($this->password)) {
@@ -44,6 +57,7 @@ new class extends Component
         $this->agent->name = $validated['name'];
         $this->agent->email = $validated['email'];
         $this->agent->is_active = (bool) ($validated['is_active'] ?? $this->agent->is_active);
+        $this->agent->supervisor_id = $validated['supervisor_id'] ?? null;
 
         if (! empty($validated['password'] ?? null)) {
             $this->agent->password = Hash::make($validated['password']);
@@ -79,6 +93,12 @@ new class extends Component
                 <flux:input wire:model.blur="email" type="email" :label="__('Email')" required />
                 <flux:input wire:model.blur="password" type="password" :label="__('Nouveau mot de passe (optionnel)')" />
                 <flux:input wire:model.blur="password_confirmation" type="password" :label="__('Confirmer le nouveau mot de passe')" />
+                <flux:select wire:model.blur="supervisor_id" :label="__('Superviseur (optionnel)')">
+                    <option value="">{{ __('Aucun superviseur') }}</option>
+                    @foreach($this->supervisors as $supervisor)
+                        <option value="{{ $supervisor->id }}">{{ $supervisor->name }}</option>
+                    @endforeach
+                </flux:select>
                 <div class="flex items-center justify-between rounded-lg border border-neutral-200 p-4 dark:border-neutral-700">
                     <div>
                         <p class="text-sm font-medium text-neutral-900 dark:text-neutral-100">{{ __('Agent actif') }}</p>

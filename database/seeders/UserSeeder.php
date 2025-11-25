@@ -25,9 +25,10 @@ class UserSeeder extends Seeder
         // Vérifier que les rôles existent
         $superAdminRole = Role::where('slug', 'super_admin')->first();
         $callCenterOwnerRole = Role::where('slug', 'call_center_owner')->first();
+        $supervisorRole = Role::where('slug', 'supervisor')->first();
         $agentRole = Role::where('slug', 'agent')->first();
 
-        if (! $superAdminRole || ! $callCenterOwnerRole || ! $agentRole) {
+        if (! $superAdminRole || ! $callCenterOwnerRole || ! $supervisorRole || ! $agentRole) {
             $this->command->error('❌ Les rôles n\'existent pas. Exécutez d\'abord: php artisan db:seed --class=RoleSeeder');
 
             return;
@@ -94,6 +95,25 @@ class UserSeeder extends Seeder
         // Associer le propriétaire au centre
         $callCenterOwner->update(['call_center_id' => $callCenter->id]);
 
+        // Créer le Superviseur
+        $supervisor = User::firstOrCreate(
+            ['email' => 'supervisor@leadmanager.com'],
+            [
+                'name' => 'Superviseur Centre d\'Appels',
+                'email' => 'supervisor@leadmanager.com',
+                'password' => Hash::make('password'),
+                'role_id' => $supervisorRole->id,
+                'call_center_id' => $callCenter->id,
+                'email_verified_at' => now(),
+            ]
+        );
+
+        if ($supervisor->wasRecentlyCreated) {
+            $this->command->info('  ✅ Superviseur créé');
+        } else {
+            $this->command->line('  ⏭️  Superviseur existe déjà');
+        }
+
         // Créer les agents
         $agents = [
             ['name' => 'Agent 1', 'email' => 'agent1@leadmanager.com'],
@@ -101,7 +121,10 @@ class UserSeeder extends Seeder
             ['name' => 'Agent 3', 'email' => 'agent3@leadmanager.com'],
         ];
 
-        foreach ($agents as $agentData) {
+        foreach ($agents as $index => $agentData) {
+            // Assigner les deux premiers agents au superviseur
+            $supervisorId = ($index < 2) ? $supervisor->id : null;
+
             $agent = User::firstOrCreate(
                 ['email' => $agentData['email']],
                 [
@@ -110,14 +133,23 @@ class UserSeeder extends Seeder
                     'password' => Hash::make('password'),
                     'role_id' => $agentRole->id,
                     'call_center_id' => $callCenter->id,
+                    'supervisor_id' => $supervisorId,
                     'email_verified_at' => now(),
                 ]
             );
 
+            // Si l'agent existe déjà mais n'a pas de superviseur, l'assigner
+            if (! $agent->wasRecentlyCreated && $supervisorId && ! $agent->supervisor_id) {
+                $agent->update(['supervisor_id' => $supervisorId]);
+                $this->command->info("  ✅ {$agentData['name']} assigné au superviseur");
+            }
+
             if ($agent->wasRecentlyCreated) {
-                $this->command->info("  ✅ {$agentData['name']} créé");
+                $supervisorInfo = $supervisorId ? " (supervisé par {$supervisor->name})" : '';
+                $this->command->info("  ✅ {$agentData['name']} créé{$supervisorInfo}");
             } else {
-                $this->command->line("  ⏭️  {$agentData['name']} existe déjà");
+                $supervisorInfo = $agent->supervisor_id ? " (supervisé par {$supervisor->name})" : '';
+                $this->command->line("  ⏭️  {$agentData['name']} existe déjà{$supervisorInfo}");
             }
         }
 
@@ -127,7 +159,9 @@ class UserSeeder extends Seeder
         $this->command->line('📋 Comptes disponibles:');
         $this->command->line('  • Super Admin: admin@leadmanager.com / password');
         $this->command->line('  • Propriétaire: owner@leadmanager.com / password');
+        $this->command->line('  • Superviseur: supervisor@leadmanager.com / password');
         $this->command->line('  • Agents: agent1@leadmanager.com, agent2@leadmanager.com, agent3@leadmanager.com / password');
+        $this->command->line('    (agent1 et agent2 sont supervisés par le superviseur)');
     }
 
     private function fixTablesStructure(): void
@@ -146,6 +180,11 @@ class UserSeeder extends Seeder
                 if (! in_array('call_center_id', $columnNames)) {
                     DB::statement('ALTER TABLE users ADD COLUMN call_center_id BIGINT UNSIGNED NULL AFTER role_id');
                     $this->command->line("  ✓ Colonne 'call_center_id' ajoutée à users");
+                }
+
+                if (! in_array('supervisor_id', $columnNames)) {
+                    DB::statement('ALTER TABLE users ADD COLUMN supervisor_id BIGINT UNSIGNED NULL AFTER call_center_id');
+                    $this->command->line("  ✓ Colonne 'supervisor_id' ajoutée à users");
                 }
             } catch (\Exception $e) {
                 $this->command->warn('  ⚠️  Erreur users: '.$e->getMessage());

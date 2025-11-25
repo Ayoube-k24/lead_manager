@@ -36,6 +36,11 @@ class RoleSeeder extends Seeder
                 'description' => 'Gère les agents au sein de son centre d\'appels et consulte les performances de son équipe',
             ],
             [
+                'name' => 'Superviseur',
+                'slug' => 'supervisor',
+                'description' => 'Supervise les agents sous sa responsabilité, suit leurs performances et gère leurs leads',
+            ],
+            [
                 'name' => 'Agent de Centre d\'Appels',
                 'slug' => 'agent',
                 'description' => 'Reçoit les leads attribués, les contacte par téléphone et met à jour leur statut',

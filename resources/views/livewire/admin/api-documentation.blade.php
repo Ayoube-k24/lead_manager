@@ -410,36 +410,83 @@ new class extends Component {
             </h2>
 
             <div class="space-y-4">
+                <div class="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20">
+                    <p class="mb-2 text-xs font-semibold text-blue-900 dark:text-blue-100">
+                        {{ __('Note importante :') }}
+                    </p>
+                    <p class="text-xs text-blue-700 dark:text-blue-300">
+                        {{ __('Les exemples ci-dessous utilisent la syntaxe Linux/Mac. Pour Windows PowerShell, utilisez la syntaxe ci-dessous.') }}
+                    </p>
+                </div>
+
+                <div>
+                    <h3 class="mb-2 font-semibold text-neutral-900 dark:text-neutral-100">
+                        {{ __('Windows PowerShell - Créer un formulaire') }}
+                    </h3>
+                    <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900">
+                        <pre class="overflow-x-auto text-xs text-neutral-700 dark:text-neutral-300"><code>$body = @{
+    name = "Formulaire de contact"
+    call_center_id = 1
+    fields = @(
+        @{
+            name = "email"
+            type = "email"
+            label = "Email"
+            required = $true
+        }
+    )
+} | ConvertTo-Json -Depth 10
+
+curl.exe -X POST "{{ url('/api/forms') }}" `
+  -H "Authorization: Bearer votre_token_ici" `
+  -H "Content-Type: application/json" `
+  -d $body</code></pre>
+                        <p class="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
+                            {{ __('Alternative simple (une ligne) :') }}
+                        </p>
+                        <pre class="mt-1 overflow-x-auto text-xs text-neutral-700 dark:text-neutral-300"><code>curl.exe -X POST "{{ url('/api/forms') }}" -H "Authorization: Bearer votre_token_ici" -H "Content-Type: application/json" -d '{\"name\":\"Formulaire\",\"call_center_id\":1,\"fields\":[{\"name\":\"email\",\"type\":\"email\",\"label\":\"Email\",\"required\":true}]}'</code></pre>
+                    </div>
+                </div>
+
                 <div>
                     <h3 class="mb-2 font-semibold text-neutral-900 dark:text-neutral-100">
                         {{ __('cURL - Créer un formulaire') }}
                     </h3>
                     <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900">
-                        <pre class="overflow-x-auto text-xs text-neutral-700 dark:text-neutral-300"><code>curl -X POST {{ url('/api/forms') }} \
+                        <pre class="overflow-x-auto text-xs text-neutral-700 dark:text-neutral-300"><code>curl -X POST "{{ url('/api/forms') }}" \
   -H "Authorization: Bearer votre_token_ici" \
   -H "Content-Type: application/json" \
-  -d '{
-    "name": "Formulaire de contact",
-    "call_center_id": 1,
-    "fields": [
+  -d "{
+    \"name\": \"Formulaire de contact\",
+    \"description\": \"Formulaire pour capturer les leads\",
+    \"call_center_id\": 1,
+    \"fields\": [
       {
-        "name": "email",
-        "type": "email",
-        "label": "Email",
-        "required": true
+        \"name\": \"email\",
+        \"type\": \"email\",
+        \"label\": \"Email\",
+        \"placeholder\": \"votre@email.com\",
+        \"required\": true
       },
       {
-        "name": "name",
-        "type": "text",
-        "label": "Nom",
-        "required": true,
-        "validation_rules": {
-          "min_length": 2,
-          "max_length": 50
+        \"name\": \"name\",
+        \"type\": \"text\",
+        \"label\": \"Nom\",
+        \"required\": true,
+        \"validation_rules\": {
+          \"min_length\": 2,
+          \"max_length\": 50
         }
+      },
+      {
+        \"name\": \"phone\",
+        \"type\": \"tel\",
+        \"label\": \"Téléphone\",
+        \"required\": false
       }
-    ]
-  }'</code></pre>
+    ],
+    \"is_active\": true
+  }"</code></pre>
                     </div>
                 </div>
 
@@ -448,19 +495,20 @@ new class extends Component {
                         {{ __('cURL - Créer un profil SMTP') }}
                     </h3>
                     <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900">
-                        <pre class="overflow-x-auto text-xs text-neutral-700 dark:text-neutral-300"><code>curl -X POST {{ url('/api/smtp-profiles') }} \
+                        <pre class="overflow-x-auto text-xs text-neutral-700 dark:text-neutral-300"><code>curl -X POST "{{ url('/api/smtp-profiles') }}" \
   -H "Authorization: Bearer votre_token_ici" \
   -H "Content-Type: application/json" \
-  -d '{
-    "name": "SMTP Gmail",
-    "host": "smtp.gmail.com",
-    "port": 587,
-    "encryption": "tls",
-    "username": "votre@email.com",
-    "password": "votre_mot_de_passe",
-    "from_address": "noreply@example.com",
-    "from_name": "Lead Manager"
-  }'</code></pre>
+  -d "{
+    \"name\": \"SMTP Gmail\",
+    \"host\": \"smtp.gmail.com\",
+    \"port\": 587,
+    \"encryption\": \"tls\",
+    \"username\": \"votre@email.com\",
+    \"password\": \"votre_mot_de_passe\",
+    \"from_address\": \"noreply@example.com\",
+    \"from_name\": \"Lead Manager\",
+    \"is_active\": true
+  }"</code></pre>
                     </div>
                 </div>
 
@@ -469,16 +517,64 @@ new class extends Component {
                         {{ __('cURL - Créer un template d\'email') }}
                     </h3>
                     <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900">
-                        <pre class="overflow-x-auto text-xs text-neutral-700 dark:text-neutral-300"><code>curl -X POST {{ url('/api/email-templates') }} \
+                        <pre class="overflow-x-auto text-xs text-neutral-700 dark:text-neutral-300"><code>curl -X POST "{{ url('/api/email-templates') }}" \
   -H "Authorization: Bearer votre_token_ici" \
   -H "Content-Type: application/json" \
-  -d '{
-    "name": "Confirmation d'\''inscription",
-    "subject": "Confirmez votre inscription",
-    "body_html": "&lt;h1&gt;Bonjour @{{name}}&lt;/h1&gt;&lt;p&gt;Cliquez sur le lien pour confirmer...&lt;/p&gt;",
-    "body_text": "Bonjour @{{name}}\\n\\nCliquez sur le lien pour confirmer...",
-    "variables": ["name", "email", "confirmation_link"]
-  }'</code></pre>
+  -d "{
+    \"name\": \"Confirmation d'inscription\",
+    \"subject\": \"Confirmez votre inscription\",
+    \"body_html\": \"&lt;h1&gt;Bonjour @{{name}}&lt;/h1&gt;&lt;p&gt;Cliquez sur le lien pour confirmer...&lt;/p&gt;\",
+    \"body_text\": \"Bonjour @{{name}}\\n\\nCliquez sur le lien pour confirmer...\",
+    \"variables\": [\"name\", \"email\", \"confirmation_link\"]
+  }"</code></pre>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="mb-2 font-semibold text-neutral-900 dark:text-neutral-100">
+                        {{ __('cURL - Liste des formulaires') }}
+                    </h3>
+                    <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900">
+                        <pre class="overflow-x-auto text-xs text-neutral-700 dark:text-neutral-300"><code>curl -X GET "{{ url('/api/forms') }}" \
+  -H "Authorization: Bearer votre_token_ici" \
+  -H "Content-Type: application/json"</code></pre>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="mb-2 font-semibold text-neutral-900 dark:text-neutral-100">
+                        {{ __('cURL - Voir un formulaire') }}
+                    </h3>
+                    <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900">
+                        <pre class="overflow-x-auto text-xs text-neutral-700 dark:text-neutral-300"><code>curl -X GET "{{ url('/api/forms/1') }}" \
+  -H "Authorization: Bearer votre_token_ici" \
+  -H "Content-Type: application/json"</code></pre>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="mb-2 font-semibold text-neutral-900 dark:text-neutral-100">
+                        {{ __('cURL - Modifier un formulaire') }}
+                    </h3>
+                    <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900">
+                        <pre class="overflow-x-auto text-xs text-neutral-700 dark:text-neutral-300"><code>curl -X PUT "{{ url('/api/forms/1') }}" \
+  -H "Authorization: Bearer votre_token_ici" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"name\": \"Formulaire de contact mis à jour\",
+    \"is_active\": false
+  }"</code></pre>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="mb-2 font-semibold text-neutral-900 dark:text-neutral-100">
+                        {{ __('cURL - Supprimer un formulaire') }}
+                    </h3>
+                    <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900">
+                        <pre class="overflow-x-auto text-xs text-neutral-700 dark:text-neutral-300"><code>curl -X DELETE "{{ url('/api/forms/1') }}" \
+  -H "Authorization: Bearer votre_token_ici" \
+  -H "Content-Type: application/json"</code></pre>
                     </div>
                 </div>
 

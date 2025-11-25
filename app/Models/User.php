@@ -28,6 +28,7 @@ class User extends Authenticatable
         'password',
         'role_id',
         'call_center_id',
+        'supervisor_id',
         'is_active',
     ];
 
@@ -86,6 +87,22 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the supervisor that supervises this user.
+     */
+    public function supervisor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'supervisor_id');
+    }
+
+    /**
+     * Get the agents supervised by this user.
+     */
+    public function supervisedAgents(): HasMany
+    {
+        return $this->hasMany(User::class, 'supervisor_id');
+    }
+
+    /**
      * Get the leads assigned to this user.
      */
     public function assignedLeads(): HasMany
@@ -107,6 +124,14 @@ class User extends Authenticatable
     public function isCallCenterOwner(): bool
     {
         return $this->role?->slug === 'call_center_owner';
+    }
+
+    /**
+     * Check if user is a supervisor.
+     */
+    public function isSupervisor(): bool
+    {
+        return $this->role?->slug === 'supervisor';
     }
 
     /**

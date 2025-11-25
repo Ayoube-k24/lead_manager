@@ -40,6 +40,14 @@
                     </flux:navlist.group>
                 @endif
 
+                @if (auth()->user()?->role?->slug === 'supervisor')
+                    <flux:navlist.group :heading="__('Supervision')" class="grid">
+                        <flux:navlist.item icon="users" :href="route('supervisor.agents')" :current="request()->routeIs('supervisor.agents*')" wire:navigate>{{ __('Mes Agents') }}</flux:navlist.item>
+                        <flux:navlist.item icon="user-group" :href="route('supervisor.leads')" :current="request()->routeIs('supervisor.leads*')" wire:navigate>{{ __('Leads de l\'équipe') }}</flux:navlist.item>
+                        <flux:navlist.item icon="chart-bar" :href="route('supervisor.statistics')" :current="request()->routeIs('supervisor.statistics*')" wire:navigate>{{ __('Statistiques') }}</flux:navlist.item>
+                    </flux:navlist.group>
+                @endif
+
                 @if (auth()->user()?->role?->slug === 'agent')
                     <flux:navlist.group :heading="__('Mes Leads')" class="grid">
                         <flux:navlist.item icon="user-group" :href="route('agent.leads')" :current="request()->routeIs('agent.leads*')" wire:navigate>{{ __('Mes Leads') }}</flux:navlist.item>
