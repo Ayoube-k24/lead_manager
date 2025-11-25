@@ -38,6 +38,16 @@ class SendLeadReminderEmail implements ShouldQueue
         }
 
         // Envoyer l'email de relance
-        $confirmationService->sendConfirmationEmail($this->lead);
+        $emailSent = $confirmationService->sendConfirmationEmail($this->lead);
+
+        if (! $emailSent) {
+            \Log::error('Failed to send reminder email in job', [
+                'lead_id' => $this->lead->id,
+                'attempt' => $this->attempts(),
+            ]);
+
+            // Relancer une exception pour que Laravel réessaie le job
+            throw new \Exception('Failed to send reminder email');
+        }
     }
 }

@@ -2,17 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\SendLeadConfirmationEmail;
 use App\Models\Form;
 use App\Services\FormValidationService;
-use App\Services\LeadConfirmationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class PublicFormController extends Controller
 {
     public function __construct(
-        protected FormValidationService $formValidationService,
-        protected LeadConfirmationService $leadConfirmationService
+        protected FormValidationService $formValidationService
     ) {}
 
     /**
@@ -86,12 +85,11 @@ class PublicFormController extends Controller
             'call_center_id' => $form->call_center_id,
         ]);
 
-        // Send confirmation email
-        $emailSent = $this->leadConfirmationService->sendConfirmationEmail($lead);
+        // Dispatch confirmation email job to queue
+        // The email will be sent asynchronously and will retry automatically if SMTP fails
+        SendLeadConfirmationEmail::dispatch($lead);
 
-        if (! $emailSent) {
-            \Log::warning('Failed to send confirmation email for lead', ['lead_id' => $lead->id]);
-        }
+        \Log::info('Confirmation email job dispatched', ['lead_id' => $lead->id]);
 
         // Log successful submission
         \Log::info('Form submitted successfully', [

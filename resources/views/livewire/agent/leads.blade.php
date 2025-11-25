@@ -51,17 +51,22 @@ new class extends Component
     public function getStatsProperty(): array
     {
         $user = Auth::user();
+        $activeStatuses = array_map(fn($s) => $s->value, \App\LeadStatus::activeStatuses());
+        $finalStatuses = array_map(fn($s) => $s->value, \App\LeadStatus::finalStatuses());
 
         return [
             'total' => Lead::where('assigned_to', $user->id)->count(),
-            'pending' => Lead::where('assigned_to', $user->id)
-                ->whereIn('status', ['pending_call', 'email_confirmed'])
+            'active' => Lead::where('assigned_to', $user->id)
+                ->whereIn('status', $activeStatuses)
                 ->count(),
-            'confirmed' => Lead::where('assigned_to', $user->id)
-                ->where('status', 'confirmed')
+            'qualified' => Lead::where('assigned_to', $user->id)
+                ->where('status', \App\LeadStatus::Qualified->value)
                 ->count(),
-            'rejected' => Lead::where('assigned_to', $user->id)
-                ->where('status', 'rejected')
+            'converted' => Lead::where('assigned_to', $user->id)
+                ->where('status', \App\LeadStatus::Converted->value)
+                ->count(),
+            'closed' => Lead::where('assigned_to', $user->id)
+                ->whereIn('status', $finalStatuses)
                 ->count(),
         ];
     }
@@ -78,22 +83,26 @@ new class extends Component
     </div>
 
     <!-- Statistiques -->
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
             <div class="text-sm font-medium text-neutral-600 dark:text-neutral-400">{{ __('Total') }}</div>
             <div class="mt-1 text-2xl font-bold text-neutral-900 dark:text-neutral-100">{{ $this->stats['total'] }}</div>
         </div>
         <div class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
-            <div class="text-sm font-medium text-neutral-600 dark:text-neutral-400">{{ __('En attente') }}</div>
-            <div class="mt-1 text-2xl font-bold text-yellow-600 dark:text-yellow-400">{{ $this->stats['pending'] }}</div>
+            <div class="text-sm font-medium text-neutral-600 dark:text-neutral-400">{{ __('Actifs') }}</div>
+            <div class="mt-1 text-2xl font-bold text-yellow-600 dark:text-yellow-400">{{ $this->stats['active'] }}</div>
         </div>
         <div class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
-            <div class="text-sm font-medium text-neutral-600 dark:text-neutral-400">{{ __('Confirmés') }}</div>
-            <div class="mt-1 text-2xl font-bold text-green-600 dark:text-green-400">{{ $this->stats['confirmed'] }}</div>
+            <div class="text-sm font-medium text-neutral-600 dark:text-neutral-400">{{ __('Qualifiés') }}</div>
+            <div class="mt-1 text-2xl font-bold text-emerald-600 dark:text-emerald-400">{{ $this->stats['qualified'] }}</div>
         </div>
         <div class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
-            <div class="text-sm font-medium text-neutral-600 dark:text-neutral-400">{{ __('Rejetés') }}</div>
-            <div class="mt-1 text-2xl font-bold text-red-600 dark:text-red-400">{{ $this->stats['rejected'] }}</div>
+            <div class="text-sm font-medium text-neutral-600 dark:text-neutral-400">{{ __('Convertis') }}</div>
+            <div class="mt-1 text-2xl font-bold text-green-600 dark:text-green-400">{{ $this->stats['converted'] }}</div>
+        </div>
+        <div class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
+            <div class="text-sm font-medium text-neutral-600 dark:text-neutral-400">{{ __('Fermés') }}</div>
+            <div class="mt-1 text-2xl font-bold text-slate-600 dark:text-slate-400">{{ $this->stats['closed'] }}</div>
         </div>
     </div>
 
@@ -107,12 +116,9 @@ new class extends Component
         />
         <flux:select wire:model.live="statusFilter" :label="__('Statut')" class="sm:w-48">
             <option value="">{{ __('Tous les statuts') }}</option>
-            <option value="pending_email">{{ __('En attente email') }}</option>
-            <option value="email_confirmed">{{ __('Email confirmé') }}</option>
-            <option value="pending_call">{{ __('En attente d\'appel') }}</option>
-            <option value="confirmed">{{ __('Confirmé') }}</option>
-            <option value="rejected">{{ __('Rejeté') }}</option>
-            <option value="callback_pending">{{ __('En attente de rappel') }}</option>
+            @foreach (\App\LeadStatus::cases() as $status)
+                <option value="{{ $status->value }}">{{ $status->label() }}</option>
+            @endforeach
         </flux:select>
     </div>
 
@@ -156,25 +162,10 @@ new class extends Component
                             </td>
                             <td class="whitespace-nowrap px-6 py-4 text-sm">
                                 @php
-                                    $statusLabels = [
-                                        'pending_email' => __('En attente email'),
-                                        'email_confirmed' => __('Email confirmé'),
-                                        'pending_call' => __('En attente d\'appel'),
-                                        'confirmed' => __('Confirmé'),
-                                        'rejected' => __('Rejeté'),
-                                        'callback_pending' => __('En attente de rappel'),
-                                    ];
-                                    $statusColors = [
-                                        'pending_email' => 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400',
-                                        'email_confirmed' => 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400',
-                                        'pending_call' => 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400',
-                                        'confirmed' => 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400',
-                                        'rejected' => 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400',
-                                        'callback_pending' => 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400',
-                                    ];
+                                    $statusEnum = $lead->getStatusEnum();
                                 @endphp
-                                <span class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ $statusColors[$lead->status] ?? 'bg-neutral-100 text-neutral-800 dark:bg-neutral-900/20 dark:text-neutral-400' }}">
-                                    {{ $statusLabels[$lead->status] ?? $lead->status }}
+                                <span class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ $statusEnum->colorClass() }}">
+                                    {{ $statusEnum->label() }}
                                 </span>
                             </td>
                             <td class="whitespace-nowrap px-6 py-4 text-sm text-neutral-600 dark:text-neutral-400">

@@ -249,3 +249,4 @@ docker-compose exec -T db mysql -u root -p lead_manager < backup.sql
 - Activez HTTPS en production
 - Configurez des sauvegardes automatiques
 
+

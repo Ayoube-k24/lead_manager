@@ -29,11 +29,17 @@ new class extends Component
     public function openUpdateModal(): void
     {
         $this->showModal = true;
-        // Initialiser avec le statut actuel s'il est valide, sinon utiliser 'confirmed' par défaut
-        $validStatuses = ['confirmed', 'rejected', 'callback_pending'];
-        $this->status = in_array($this->lead->status, $validStatuses)
-            ? $this->lead->status
-            : 'confirmed';
+        // Initialiser avec le statut actuel s'il est valide, sinon utiliser le premier statut post-appel par défaut
+        $statusEnum = $this->lead->getStatusEnum();
+        $postCallStatuses = \App\LeadStatus::postCallStatuses();
+        
+        if (in_array($statusEnum, $postCallStatuses)) {
+            $this->status = $statusEnum->value;
+        } else {
+            // Utiliser 'qualified' par défaut pour les nouveaux appels
+            $this->status = \App\LeadStatus::Qualified->value;
+        }
+        
         $this->comment = $this->lead->call_comment ?? '';
     }
 
@@ -46,8 +52,14 @@ new class extends Component
 
     public function updateStatus(): void
     {
+        // Get valid status values from enum
+        $validStatuses = array_map(
+            fn($status) => $status->value,
+            \App\LeadStatus::postCallStatuses()
+        );
+        
         $this->validate([
-            'status' => ['required', 'in:confirmed,rejected,callback_pending'],
+            'status' => ['required', 'in:'.implode(',', $validStatuses)],
             'comment' => ['nullable', 'string', 'max:1000'],
         ]);
 
@@ -59,11 +71,15 @@ new class extends Component
 
     public function getStatusOptionsProperty(): array
     {
-        return [
-            'confirmed' => __('Confirmé'),
-            'rejected' => __('Rejeté'),
-            'callback_pending' => __('En attente de rappel'),
-        ];
+        // Get all post-call statuses from the enum
+        $statuses = \App\LeadStatus::postCallStatuses();
+        $options = [];
+        
+        foreach ($statuses as $status) {
+            $options[$status->value] = $status->label();
+        }
+        
+        return $options;
     }
 }; ?>
 
@@ -81,7 +97,11 @@ new class extends Component
                 {{ __('Détails du Lead') }}
             </h1>
         </div>
-        @if (in_array($this->lead->status, ['pending_call', 'email_confirmed', 'callback_pending']))
+        @php
+            $statusEnum = $this->lead->getStatusEnum();
+            $canUpdate = $statusEnum->isActive() || in_array($statusEnum, \App\LeadStatus::postCallStatuses());
+        @endphp
+        @if ($canUpdate)
             <flux:button wire:click="openUpdateModal" variant="primary">
                 {{ __('Mettre à jour le statut') }}
             </flux:button>
@@ -103,25 +123,10 @@ new class extends Component
                     <dt class="text-sm font-medium text-neutral-500 dark:text-neutral-400">{{ __('Statut') }}</dt>
                     <dd class="mt-1">
                         @php
-                            $statusLabels = [
-                                'pending_email' => __('En attente email'),
-                                'email_confirmed' => __('Email confirmé'),
-                                'pending_call' => __('En attente d\'appel'),
-                                'confirmed' => __('Confirmé'),
-                                'rejected' => __('Rejeté'),
-                                'callback_pending' => __('En attente de rappel'),
-                            ];
-                            $statusColors = [
-                                'pending_email' => 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400',
-                                'email_confirmed' => 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400',
-                                'pending_call' => 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400',
-                                'confirmed' => 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400',
-                                'rejected' => 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400',
-                                'callback_pending' => 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400',
-                            ];
+                            $statusEnum = $this->lead->getStatusEnum();
                         @endphp
-                        <span class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ $statusColors[$this->lead->status] ?? 'bg-neutral-100 text-neutral-800 dark:bg-neutral-900/20 dark:text-neutral-400' }}">
-                            {{ $statusLabels[$this->lead->status] ?? $this->lead->status }}
+                        <span class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ $statusEnum->colorClass() }}">
+                            {{ $statusEnum->label() }}
                         </span>
                     </dd>
                 </div>
@@ -178,6 +183,56 @@ new class extends Component
                 {{ __('Commentaire d\'appel') }}
             </h2>
             <p class="text-sm text-neutral-900 dark:text-neutral-100">{{ $this->lead->call_comment }}</p>
+        </div>
+    @endif
+
+    <!-- Historique des statuts -->
+    @php
+        $statusHistory = $this->lead->getStatusHistory();
+    @endphp
+    @if ($statusHistory->isNotEmpty())
+        <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
+            <h2 class="mb-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                {{ __('Historique des statuts') }}
+            </h2>
+            <div class="space-y-3">
+                @foreach ($statusHistory as $log)
+                    @php
+                        $oldStatus = \App\LeadStatus::tryFrom($log->properties['old_status'] ?? '');
+                        $newStatus = \App\LeadStatus::tryFrom($log->properties['new_status'] ?? '');
+                    @endphp
+                    <div class="flex items-start gap-3 border-b border-neutral-200 pb-3 last:border-0 dark:border-neutral-700">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2">
+                                @if ($oldStatus && $newStatus)
+                                    <span class="text-sm text-neutral-600 dark:text-neutral-400">
+                                        {{ $oldStatus->label() }}
+                                    </span>
+                                    <span class="text-neutral-400">→</span>
+                                    <span class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ $newStatus->colorClass() }}">
+                                        {{ $newStatus->label() }}
+                                    </span>
+                                @else
+                                    <span class="text-sm text-neutral-900 dark:text-neutral-100">
+                                        {{ $log->properties['new_status'] ?? 'N/A' }}
+                                    </span>
+                                @endif
+                            </div>
+                            @if (!empty($log->properties['comment']))
+                                <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                                    {{ $log->properties['comment'] }}
+                                </p>
+                            @endif
+                            <p class="mt-1 text-xs text-neutral-400 dark:text-neutral-500">
+                                {{ $log->created_at->format('d/m/Y H:i') }}
+                                @if ($log->user)
+                                    • {{ $log->user->name }}
+                                @endif
+                            </p>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
         </div>
     @endif
 
