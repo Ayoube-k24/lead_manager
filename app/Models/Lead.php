@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\LeadStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -94,12 +95,53 @@ class Lead extends Model
     }
 
     /**
+     * Get the current status as LeadStatus enum.
+     */
+    public function getStatusEnum(): LeadStatus
+    {
+        return LeadStatus::tryFrom($this->attributes['status'] ?? 'pending_email') ?? LeadStatus::PendingEmail;
+    }
+
+    /**
+     * Set the status from enum or string.
+     */
+    public function setStatus(LeadStatus|string $status): void
+    {
+        if ($status instanceof LeadStatus) {
+            $this->attributes['status'] = $status->value;
+        } else {
+            $statusEnum = LeadStatus::tryFrom($status);
+            if ($statusEnum) {
+                $this->attributes['status'] = $statusEnum->value;
+            } else {
+                $this->attributes['status'] = $status;
+            }
+        }
+    }
+
+    /**
+     * Check if the lead has an active status.
+     */
+    public function isActive(): bool
+    {
+        return $this->getStatusEnum()->isActive();
+    }
+
+    /**
+     * Check if the lead has a final status.
+     */
+    public function isFinal(): bool
+    {
+        return $this->getStatusEnum()->isFinal();
+    }
+
+    /**
      * Confirm the email.
      */
     public function confirmEmail(): void
     {
         $this->email_confirmed_at = now();
-        $this->status = 'email_confirmed';
+        $this->setStatus(LeadStatus::EmailConfirmed);
         // Use save() to trigger Observer
         $this->save();
 
@@ -116,17 +158,32 @@ class Lead extends Model
      */
     public function markAsPendingCall(): void
     {
-        $this->status = 'pending_call';
+        $this->setStatus(LeadStatus::PendingCall);
         $this->save();
     }
 
     /**
      * Update status after call.
      */
-    public function updateAfterCall(string $status, ?string $comment = null): void
+    public function updateAfterCall(LeadStatus|string $status, ?string $comment = null): void
     {
         $oldStatus = $this->status;
-        $this->status = $status;
+
+        // Convert string to enum if needed
+        if (is_string($status)) {
+            $statusEnum = LeadStatus::tryFrom($status);
+            if (! $statusEnum) {
+                throw new \InvalidArgumentException("Invalid status: {$status}");
+            }
+            $status = $statusEnum;
+        }
+
+        // Validate that the status can be set after a call
+        if (! $status->canBeSetAfterCall()) {
+            throw new \InvalidArgumentException("Status {$status->value} cannot be set after a call");
+        }
+
+        $this->setStatus($status);
         $this->called_at = now();
         if ($comment) {
             $this->call_comment = $comment;
@@ -136,9 +193,24 @@ class Lead extends Model
         // Log the status update
         try {
             $auditService = app(\App\Services\AuditService::class);
-            $auditService->logLeadStatusUpdated($this, $oldStatus, $status, $comment);
+            $auditService->logLeadStatusUpdated($this, $oldStatus, $status->value, $comment);
         } catch (\Exception $e) {
             // Silently fail if audit service is not available (e.g., in tests)
         }
+    }
+
+    /**
+     * Get status history from activity logs.
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, \App\Models\ActivityLog>
+     */
+    public function getStatusHistory()
+    {
+        return \App\Models\ActivityLog::where('subject_type', self::class)
+            ->where('subject_id', $this->id)
+            ->where('action', 'lead.status_updated')
+            ->with('user')
+            ->orderBy('created_at', 'desc')
+            ->get();
     }
 }
