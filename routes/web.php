@@ -96,6 +96,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('owner.statistics.export.pdf');
         Route::get('owner/leads/export/csv', [\App\Http\Controllers\ExportController::class, 'exportLeadsCsv'])
             ->name('owner.leads.export.csv');
+
+        // API Tokens and Documentation (Call Center Owners)
+        Volt::route('owner/api-tokens', 'admin.api-tokens')
+            ->name('owner.api-tokens');
+        Volt::route('owner/api/documentation', 'admin.api-documentation')
+            ->name('owner.api.documentation');
     });
 
     // Sprint 2: Gestion des formulaires et profils SMTP (Super Admin uniquement)
@@ -151,6 +157,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Sprint 6: Audit des actions (Super Admin)
         Volt::route('admin/audit-logs', 'admin.audit-logs')
             ->name('admin.audit-logs');
+
+        // API Tokens and Documentation
+        Volt::route('admin/api-tokens', 'admin.api-tokens')
+            ->name('admin.api-tokens');
+        Volt::route('admin/api/documentation', 'admin.api-documentation')
+            ->name('admin.api.documentation');
     });
 });
 
