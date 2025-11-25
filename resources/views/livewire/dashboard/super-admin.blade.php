@@ -127,7 +127,7 @@ new class extends Component {
                 y compris la gestion des utilisateurs, des centres d'appels, des formulaires et des configurations système.
             </p>
             
-            <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
+            <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-6">
                 <flux:button href="{{ route('admin.forms') }}" variant="primary" class="w-full" wire:navigate>
                     {{ __('Gérer les Formulaires') }}
                 </flux:button>
@@ -143,13 +143,16 @@ new class extends Component {
                 <flux:button href="{{ route('admin.call-centers') }}" variant="primary" class="w-full" wire:navigate>
                     {{ __('Gestion des Centres') }}
                 </flux:button>
+                <flux:button href="{{ route('admin.call-centers.leads') }}" variant="primary" class="w-full" wire:navigate>
+                    {{ __('Leads par Centre') }}
+                </flux:button>
             </div>
         </div>
 
         <!-- Actions rapides -->
         <div class="rounded-xl border border-neutral-200 bg-white p-6 dark:border-neutral-700 dark:bg-neutral-800">
             <h2 class="mb-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{{ __('Actions rapides') }}</h2>
-            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <flux:button href="{{ route('admin.forms.create') }}" variant="ghost" class="w-full justify-start" wire:navigate>
                     <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -173,6 +176,12 @@ new class extends Component {
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 102 2 2 2 0 00-2-2zm-6 0a2 2 0 102 2 2 2 0 00-2-2zM5 7a2 2 0 102 2 2 2 0 00-2-2zm14 6H5a2 2 0 00-2 2v3h18v-3a2 2 0 00-2-2z" />
                     </svg>
                     {{ __('Gérer les accès centres') }}
+                </flux:button>
+                <flux:button href="{{ route('admin.call-centers.leads') }}" variant="ghost" class="w-full justify-start" wire:navigate>
+                    <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18" />
+                    </svg>
+                    {{ __('Leads par centre') }}
                 </flux:button>
                 <flux:button href="{{ route('admin.leads') }}" variant="ghost" class="w-full justify-start" wire:navigate>
                     <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

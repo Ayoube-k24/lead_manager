@@ -31,7 +31,7 @@ new class extends Component
             return collect();
         }
 
-        return User::where('call_center_id', $callCenter->id)
+        $query = User::where('call_center_id', $callCenter->id)
             ->whereHas('role', fn ($q) => $q->where('slug', 'agent'))
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
@@ -39,12 +39,17 @@ new class extends Component
                         ->orWhere('email', 'like', '%'.$this->search.'%');
                 });
             })
-            ->withCount(['assignedLeads'])
-            ->latest()
-            ->paginate(15);
+            ->withCount(['assignedLeads']);
+
+        // Only order by is_active if the column exists
+        if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'is_active')) {
+            $query->orderByDesc('is_active');
+        }
+
+        return $query->latest()->paginate(15);
     }
 
-    public function delete(User $agent): void
+    public function toggleStatus(User $agent): void
     {
         // Vérifier que l'agent appartient au centre d'appels du propriétaire
         $user = Auth::user();
@@ -52,14 +57,16 @@ new class extends Component
             return;
         }
 
-        // Vérifier qu'il n'y a pas de leads assignés
-        if ($agent->assignedLeads()->whereIn('status', ['pending_call', 'email_confirmed', 'callback_pending'])->exists()) {
+        // Vérifier qu'il n'y a pas de leads assignés si on désactive
+        if ($agent->is_active && $agent->assignedLeads()->whereIn('status', ['pending_call', 'email_confirmed', 'callback_pending'])->exists()) {
             $this->dispatch('agent-has-leads');
             return;
         }
 
-        $agent->delete();
-        $this->dispatch('agent-deleted');
+        $agent->is_active = ! $agent->is_active;
+        $agent->save();
+
+        $this->dispatch($agent->is_active ? 'agent-activated' : 'agent-deactivated');
     }
 
     public function getAgentStats(User $agent): array
@@ -111,6 +118,9 @@ new class extends Component
                             {{ __('Email') }}
                         </th>
                         <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                            {{ __('Statut') }}
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                             {{ __('Leads assignés') }}
                         </th>
                         <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
@@ -132,6 +142,17 @@ new class extends Component
                             </td>
                             <td class="whitespace-nowrap px-6 py-4 text-sm text-neutral-600 dark:text-neutral-400">
                                 {{ $agent->email }}
+                            </td>
+                            <td class="whitespace-nowrap px-6 py-4 text-sm">
+                                @if ($agent->is_active)
+                                    <span class="inline-flex rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
+                                        {{ __('Actif') }}
+                                    </span>
+                                @else
+                                    <span class="inline-flex rounded-full bg-neutral-200 px-2 py-1 text-xs font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+                                        {{ __('Désactivé') }}
+                                    </span>
+                                @endif
                             </td>
                             <td class="whitespace-nowrap px-6 py-4 text-sm text-neutral-600 dark:text-neutral-400">
                                 {{ $agent->assigned_leads_count }}
@@ -158,12 +179,12 @@ new class extends Component
                                         {{ __('Modifier') }}
                                     </flux:button>
                                     <flux:button
-                                        wire:click="delete({{ $agent->id }})"
-                                        wire:confirm="{{ __('Êtes-vous sûr de vouloir supprimer cet agent ?') }}"
-                                        variant="ghost"
+                                        wire:click="toggleStatus({{ $agent->id }})"
+                                        wire:confirm="{{ $agent->is_active ? __('Désactiver cet agent ? Les leads en cours doivent être réassignés.') : __('Réactiver cet agent ?') }}"
+                                        variant="{{ $agent->is_active ? 'danger' : 'success' }}"
                                         size="sm"
                                     >
-                                        {{ __('Supprimer') }}
+                                        {{ $agent->is_active ? __('Désactiver') : __('Réactiver') }}
                                     </flux:button>
                                 </div>
                             </td>

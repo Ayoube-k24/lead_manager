@@ -95,3 +95,30 @@ test('super admin can update call center access', function () {
     expect($initialOwner->fresh()->call_center_id)->toBeNull();
 });
 
+test('super admin can create call center and owner account without registration page', function () {
+    Livewire::actingAs($this->superAdmin)
+        ->test('admin.call-centers')
+        ->call('openCreateModal')
+        ->set('newCenterName', 'Centre Nice')
+        ->set('newCenterDescription', 'Centre axé sur les leads B2B')
+        ->set('newOwnerName', 'Alice Dupuis')
+        ->set('newOwnerEmail', 'alice.dupuis@example.com')
+        ->set('newOwnerPassword', 'SecurePass123!')
+        ->set('newDistributionMethod', 'weighted')
+        ->set('newIsActive', true)
+        ->call('createCallCenter')
+        ->assertHasNoErrors()
+        ->assertSet('showCreateModal', false);
+
+    $owner = User::where('email', 'alice.dupuis@example.com')->first();
+    $callCenter = CallCenter::where('name', 'Centre Nice')->first();
+
+    expect($owner)->not->toBeNull()
+        ->and($callCenter)->not->toBeNull()
+        ->and($owner->role?->slug)->toBe('call_center_owner')
+        ->and($owner->call_center_id)->toBe($callCenter->id)
+        ->and($callCenter->owner_id)->toBe($owner->id)
+        ->and($callCenter->distribution_method)->toBe('weighted')
+        ->and($callCenter->is_active)->toBeTrue();
+});
+

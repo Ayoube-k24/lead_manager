@@ -43,6 +43,7 @@ new class extends Component
             'role_id' => $agentRole->id,
             'call_center_id' => $callCenter->id,
             'email_verified_at' => now(),
+            'is_active' => true,
         ]);
 
         $this->redirect(route('owner.agents'), navigate: true);

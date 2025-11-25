@@ -109,6 +109,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('admin.smtp-profiles.edit');
         Volt::route('admin/call-centers', 'admin.call-centers')
             ->name('admin.call-centers');
+        Volt::route('admin/call-centers/leads', 'admin.call-centers.leads')
+            ->name('admin.call-centers.leads');
 
         // Templates d'email
         Volt::route('admin/email-templates', 'admin.email-templates')

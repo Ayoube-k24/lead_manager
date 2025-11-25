@@ -3,6 +3,7 @@
 use App\Models\CallCenter;
 use App\Models\Form;
 use App\Models\Lead;
+use Illuminate\Http\Request;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 
@@ -15,9 +16,12 @@ new class extends Component
     public ?int $callCenterFilter = null;
     public ?int $formFilter = null;
 
-    public function mount(): void
+    public function mount(Request $request): void
     {
-        //
+        $callCenterId = $request->query('callCenter');
+        if ($callCenterId) {
+            $this->callCenterFilter = (int) $callCenterId;
+        }
     }
 
     public function updatingSearch(): void

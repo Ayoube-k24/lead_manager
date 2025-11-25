@@ -12,6 +12,7 @@ new class extends Component
     public string $email = '';
     public string $password = '';
     public string $password_confirmation = '';
+    public bool $is_active = true;
 
     public function mount(User $user): void
     {
@@ -23,6 +24,7 @@ new class extends Component
         $this->agent = $user;
         $this->name = $user->name;
         $this->email = $user->email;
+        $this->is_active = (bool) $user->is_active;
     }
 
     public function update(): void
@@ -30,6 +32,7 @@ new class extends Component
         $rules = [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,'.$this->agent->id],
+            'is_active' => ['boolean'],
         ];
 
         if (! empty($this->password)) {
@@ -40,6 +43,7 @@ new class extends Component
 
         $this->agent->name = $validated['name'];
         $this->agent->email = $validated['email'];
+        $this->agent->is_active = (bool) ($validated['is_active'] ?? $this->agent->is_active);
 
         if (! empty($validated['password'] ?? null)) {
             $this->agent->password = Hash::make($validated['password']);
@@ -75,6 +79,13 @@ new class extends Component
                 <flux:input wire:model.blur="email" type="email" :label="__('Email')" required />
                 <flux:input wire:model.blur="password" type="password" :label="__('Nouveau mot de passe (optionnel)')" />
                 <flux:input wire:model.blur="password_confirmation" type="password" :label="__('Confirmer le nouveau mot de passe')" />
+                <div class="flex items-center justify-between rounded-lg border border-neutral-200 p-4 dark:border-neutral-700">
+                    <div>
+                        <p class="text-sm font-medium text-neutral-900 dark:text-neutral-100">{{ __('Agent actif') }}</p>
+                        <p class="text-xs text-neutral-500 dark:text-neutral-400">{{ __('Désactivez pour suspendre temporairement cet agent.') }}</p>
+                    </div>
+                    <flux:switch wire:model="is_active" />
+                </div>
             </div>
         </div>
 

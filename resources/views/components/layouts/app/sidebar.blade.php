@@ -21,6 +21,8 @@
                         <flux:navlist.item icon="document-text" :href="route('admin.forms')" :current="request()->routeIs('admin.forms*')" wire:navigate>{{ __('Formulaires') }}</flux:navlist.item>
                         <flux:navlist.item icon="envelope" :href="route('admin.smtp-profiles')" :current="request()->routeIs('admin.smtp-profiles*')" wire:navigate>{{ __('Profils SMTP') }}</flux:navlist.item>
                         <flux:navlist.item icon="document-duplicate" :href="route('admin.email-templates')" :current="request()->routeIs('admin.email-templates*')" wire:navigate>{{ __('Templates d\'email') }}</flux:navlist.item>
+                        <flux:navlist.item icon="building-office-2" :href="route('admin.call-centers')" :current="request()->routeIs('admin.call-centers*')" wire:navigate>{{ __('Centres d\'appels') }}</flux:navlist.item>
+                        <flux:navlist.item icon="table-cells" :href="route('admin.call-centers.leads')" :current="request()->routeIs('admin.call-centers.leads')" wire:navigate>{{ __('Leads par centre') }}</flux:navlist.item>
                         <flux:navlist.item icon="user-group" :href="route('admin.leads')" :current="request()->routeIs('admin.leads*')" wire:navigate>{{ __('Leads') }}</flux:navlist.item>
                         <flux:navlist.item icon="chart-bar" :href="route('admin.statistics')" :current="request()->routeIs('admin.statistics*')" wire:navigate>{{ __('Statistiques') }}</flux:navlist.item>
                         <flux:navlist.item icon="document-text" :href="route('admin.audit-logs')" :current="request()->routeIs('admin.audit-logs*')" wire:navigate>{{ __('Journal d\'Audit') }}</flux:navlist.item>

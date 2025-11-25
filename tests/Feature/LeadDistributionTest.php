@@ -38,6 +38,33 @@ test('round robin distribution assigns leads evenly', function () {
         ->and($assignedAgent2->id)->toBeIn([$agent1->id, $agent2->id]);
 });
 
+test('inactive agents are skipped during distribution', function () {
+    $callCenter = CallCenter::factory()->create(['distribution_method' => 'round_robin']);
+    $agentRole = Role::firstOrCreate(
+        ['slug' => 'agent'],
+        ['name' => 'Agent', 'slug' => 'agent']
+    );
+
+    $activeAgent = User::factory()->create([
+        'role_id' => $agentRole->id,
+        'call_center_id' => $callCenter->id,
+        'is_active' => true,
+    ]);
+    $inactiveAgent = User::factory()->create([
+        'role_id' => $agentRole->id,
+        'call_center_id' => $callCenter->id,
+        'is_active' => false,
+    ]);
+
+    $service = app(LeadDistributionService::class);
+    $lead = Lead::factory()->create(['call_center_id' => $callCenter->id, 'status' => 'email_confirmed']);
+
+    $assignedAgent = $service->distributeLead($lead);
+
+    expect($assignedAgent)->not->toBeNull()
+        ->and($assignedAgent->id)->toBe($activeAgent->id);
+});
+
 test('manual assignment works correctly', function () {
     $callCenter = CallCenter::factory()->create();
     $agentRole = Role::firstOrCreate(

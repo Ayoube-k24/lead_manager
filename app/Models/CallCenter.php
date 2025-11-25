@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Form;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -60,5 +61,13 @@ class CallCenter extends Model
     public function leads(): HasMany
     {
         return $this->hasMany(Lead::class);
+    }
+
+    /**
+     * Get the forms that belong to this call center.
+     */
+    public function forms(): HasMany
+    {
+        return $this->hasMany(Form::class);
     }
 }

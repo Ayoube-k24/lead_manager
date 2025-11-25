@@ -127,6 +127,7 @@ class LeadDistributionService
     {
         return User::where('call_center_id', $callCenter->id)
             ->whereHas('role', fn ($q) => $q->where('slug', 'agent'))
+            ->where('is_active', true)
             ->with('role')
             ->get()
             ->filter(fn ($user) => $user->isAgent());
@@ -287,12 +288,13 @@ class LeadDistributionService
             return false;
         }
 
-        // Verify agent is actually an agent
-        if (! $agent->isAgent()) {
-            \Log::warning('Cannot assign lead: user is not an agent', [
+        // Verify agent is actually an agent and active
+        if (! $agent->isAgent() || ! $agent->is_active) {
+            \Log::warning('Cannot assign lead: user is not an active agent', [
                 'lead_id' => $lead->id,
                 'user_id' => $agent->id,
                 'user_role' => $agent->role?->slug,
+                'is_active' => $agent->is_active,
             ]);
 
             return false;
