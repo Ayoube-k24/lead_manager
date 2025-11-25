@@ -127,7 +127,7 @@ new class extends Component {
                 y compris la gestion des utilisateurs, des centres d'appels, des formulaires et des configurations système.
             </p>
             
-            <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+            <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
                 <flux:button href="{{ route('admin.forms') }}" variant="primary" class="w-full" wire:navigate>
                     {{ __('Gérer les Formulaires') }}
                 </flux:button>
@@ -139,6 +139,9 @@ new class extends Component {
                 </flux:button>
                 <flux:button href="{{ route('admin.leads') }}" variant="primary" class="w-full" wire:navigate>
                     {{ __('Voir tous les Leads') }}
+                </flux:button>
+                <flux:button href="{{ route('admin.call-centers') }}" variant="primary" class="w-full" wire:navigate>
+                    {{ __('Gestion des Centres') }}
                 </flux:button>
             </div>
         </div>
@@ -164,6 +167,12 @@ new class extends Component {
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                     </svg>
                     {{ __('Nouveau template') }}
+                </flux:button>
+                <flux:button href="{{ route('admin.call-centers') }}" variant="ghost" class="w-full justify-start" wire:navigate>
+                    <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 102 2 2 2 0 00-2-2zm-6 0a2 2 0 102 2 2 2 0 00-2-2zM5 7a2 2 0 102 2 2 2 0 00-2-2zm14 6H5a2 2 0 00-2 2v3h18v-3a2 2 0 00-2-2z" />
+                    </svg>
+                    {{ __('Gérer les accès centres') }}
                 </flux:button>
                 <flux:button href="{{ route('admin.leads') }}" variant="ghost" class="w-full justify-start" wire:navigate>
                     <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
