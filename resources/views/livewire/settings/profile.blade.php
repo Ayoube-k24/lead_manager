@@ -111,6 +111,13 @@ new class extends Component {
             </div>
         </form>
 
-        <livewire:settings.delete-user-form />
+        <flux:callout variant="neutral" class="mt-10">
+            <flux:heading size="md">
+                {{ __('Suppression du compte désactivée') }}
+            </flux:heading>
+            <flux:subheading>
+                {{ __('Pour des raisons de conformité et de sécurité, la suppression automatique des comptes est désactivée. Merci de contacter un administrateur si vous avez besoin d\'une fermeture de compte.') }}
+            </flux:subheading>
+        </flux:callout>
     </x-settings.layout>
 </section>

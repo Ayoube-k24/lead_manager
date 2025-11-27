@@ -30,6 +30,7 @@ class User extends Authenticatable
         'call_center_id',
         'supervisor_id',
         'is_active',
+        'experience_level',
     ];
 
     /**
@@ -55,6 +56,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'experience_level' => 'string',
         ];
     }
 
@@ -156,5 +158,45 @@ class User extends Authenticatable
     public function apiTokens(): HasMany
     {
         return $this->hasMany(ApiToken::class);
+    }
+
+    /**
+     * Get the lead notes created by this user.
+     */
+    public function leadNotes(): HasMany
+    {
+        return $this->hasMany(LeadNote::class);
+    }
+
+    /**
+     * Get the reminders created by this user.
+     */
+    public function reminders(): HasMany
+    {
+        return $this->hasMany(LeadReminder::class);
+    }
+
+    /**
+     * Check if user is a beginner agent.
+     */
+    public function isBeginner(): bool
+    {
+        return $this->experience_level === 'beginner';
+    }
+
+    /**
+     * Check if user is an intermediate agent.
+     */
+    public function isIntermediate(): bool
+    {
+        return $this->experience_level === 'intermediate';
+    }
+
+    /**
+     * Check if user is an advanced agent.
+     */
+    public function isAdvanced(): bool
+    {
+        return $this->experience_level === 'advanced';
     }
 }

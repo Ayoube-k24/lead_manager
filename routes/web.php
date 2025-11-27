@@ -73,6 +73,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('agent.leads');
         Volt::route('agent/leads/{lead}', 'agent.leads.show')
             ->name('agent.leads.show');
+
+        // Sprint 8: Calendrier des rappels
+        Volt::route('agent/reminders/calendar', 'reminders.calendar')
+            ->name('agent.reminders.calendar');
     });
 
     // Gestion des agents par les superviseurs
@@ -114,11 +118,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('owner/leads/export/csv', [\App\Http\Controllers\ExportController::class, 'exportLeadsCsv'])
             ->name('owner.leads.export.csv');
 
-        // API Tokens and Documentation (Call Center Owners)
-        Volt::route('owner/api-tokens', 'admin.api-tokens')
-            ->name('owner.api-tokens');
-        Volt::route('owner/api/documentation', 'admin.api-documentation')
-            ->name('owner.api.documentation');
+        // Sprint 8: Gestion des Tags (Call Center Owners)
+        Volt::route('owner/tags', 'owner.tags')
+            ->name('owner.tags');
+        Volt::route('owner/tags/create', 'owner.tags.create')
+            ->name('owner.tags.create');
+        Volt::route('owner/tags/{tag}/edit', 'owner.tags.edit')
+            ->name('owner.tags.edit');
     });
 
     // Sprint 2: Gestion des formulaires et profils SMTP (Super Admin uniquement)
@@ -155,6 +161,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Volt::route('admin/forms/{form}/info', 'admin.forms.info')
             ->name('admin.forms.info');
 
+        // Sprint 7: Webhooks
+        Volt::route('admin/webhooks', 'admin.webhooks')
+            ->name('admin.webhooks');
+        Volt::route('admin/webhooks/create', 'admin.webhooks.create')
+            ->name('admin.webhooks.create');
+        Volt::route('admin/webhooks/{webhook}/edit', 'admin.webhooks.edit')
+            ->name('admin.webhooks.edit');
+
         // Sprint 4: Gestion des leads (Super Admin)
         Volt::route('admin/leads', 'admin.leads')
             ->name('admin.leads');
@@ -175,6 +189,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Volt::route('admin/audit-logs', 'admin.audit-logs')
             ->name('admin.audit-logs');
 
+        // Sprint 8: Gestion des Tags (Super Admin)
+        Volt::route('admin/tags', 'admin.tags')
+            ->name('admin.tags');
+        Volt::route('admin/tags/create', 'admin.tags.create')
+            ->name('admin.tags.create');
+        Volt::route('admin/tags/{tag}/edit', 'admin.tags.edit')
+            ->name('admin.tags.edit');
+
+        // Sprint 8: Configuration du Scoring (Super Admin)
+        Volt::route('admin/scoring', 'admin.scoring')
+            ->name('admin.scoring');
+
         // API Tokens and Documentation
         Volt::route('admin/api-tokens', 'admin.api-tokens')
             ->name('admin.api-tokens');
@@ -189,6 +215,7 @@ Route::middleware(['auth'])->group(function () {
     Volt::route('settings/profile', 'settings.profile')->name('profile.edit');
     Volt::route('settings/password', 'settings.password')->name('user-password.edit');
     Volt::route('settings/appearance', 'settings.appearance')->name('appearance.edit');
+    Volt::route('settings/alerts', 'settings.alerts')->name('settings.alerts');
 
     Volt::route('settings/two-factor', 'settings.two-factor')
         ->middleware(

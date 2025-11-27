@@ -27,6 +27,9 @@
                         <flux:navlist.item icon="chart-bar" :href="route('admin.statistics')" :current="request()->routeIs('admin.statistics*')" wire:navigate>{{ __('Statistiques') }}</flux:navlist.item>
                         <flux:navlist.item icon="document-text" :href="route('admin.audit-logs')" :current="request()->routeIs('admin.audit-logs*')" wire:navigate>{{ __('Journal d\'Audit') }}</flux:navlist.item>
                         <flux:navlist.item icon="key" :href="route('admin.api-tokens')" :current="request()->routeIs('admin.api*')" wire:navigate>{{ __('Tokens API') }}</flux:navlist.item>
+                        <flux:navlist.item icon="globe-alt" :href="route('admin.webhooks')" :current="request()->routeIs('admin.webhooks*')" wire:navigate>{{ __('Webhooks') }}</flux:navlist.item>
+                        <flux:navlist.item icon="tag" :href="route('admin.tags')" :current="request()->routeIs('admin.tags*')" wire:navigate>{{ __('Tags') }}</flux:navlist.item>
+                        <flux:navlist.item icon="chart-bar" :href="route('admin.scoring')" :current="request()->routeIs('admin.scoring*')" wire:navigate>{{ __('Configuration Scoring') }}</flux:navlist.item>
                     </flux:navlist.group>
                 @endif
 
@@ -36,7 +39,7 @@
                         <flux:navlist.item icon="user-group" :href="route('owner.leads')" :current="request()->routeIs('owner.leads*')" wire:navigate>{{ __('Leads') }}</flux:navlist.item>
                         <flux:navlist.item icon="arrows-right-left" :href="route('owner.distribution')" :current="request()->routeIs('owner.distribution*')" wire:navigate>{{ __('Distribution') }}</flux:navlist.item>
                         <flux:navlist.item icon="chart-bar" :href="route('owner.statistics')" :current="request()->routeIs('owner.statistics*')" wire:navigate>{{ __('Statistiques') }}</flux:navlist.item>
-                        <flux:navlist.item icon="key" :href="route('owner.api-tokens')" :current="request()->routeIs('owner.api*')" wire:navigate>{{ __('Tokens API') }}</flux:navlist.item>
+                        <flux:navlist.item icon="tag" :href="route('owner.tags')" :current="request()->routeIs('owner.tags*')" wire:navigate>{{ __('Tags') }}</flux:navlist.item>
                     </flux:navlist.group>
                 @endif
 
@@ -51,8 +54,13 @@
                 @if (auth()->user()?->role?->slug === 'agent')
                     <flux:navlist.group :heading="__('Mes Leads')" class="grid">
                         <flux:navlist.item icon="user-group" :href="route('agent.leads')" :current="request()->routeIs('agent.leads*')" wire:navigate>{{ __('Mes Leads') }}</flux:navlist.item>
+                        <flux:navlist.item icon="calendar" :href="route('agent.reminders.calendar')" :current="request()->routeIs('agent.reminders*')" wire:navigate>{{ __('Calendrier des Rappels') }}</flux:navlist.item>
                     </flux:navlist.group>
                 @endif
+
+                <flux:navlist.group :heading="__('Notifications')" class="grid">
+                    <flux:navlist.item icon="bell" :href="route('settings.alerts')" :current="request()->routeIs('settings.alerts*')" wire:navigate>{{ __('Alertes') }}</flux:navlist.item>
+                </flux:navlist.group>
             </flux:navlist>
 
             <flux:spacer />

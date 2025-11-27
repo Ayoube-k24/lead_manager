@@ -7,7 +7,8 @@ use App\Models\SmtpProfile;
 use App\Models\User;
 use Livewire\Volt\Component;
 
-new class extends Component {
+new class extends Component
+{
     public $stats = [];
 
     public function mount(): void
@@ -194,6 +195,12 @@ new class extends Component {
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                     </svg>
                     {{ __('Statistiques avancées') }}
+                </flux:button>
+                <flux:button href="{{ route('admin.webhooks') }}" variant="ghost" class="w-full justify-start" wire:navigate>
+                    <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+                    </svg>
+                    {{ __('Webhooks') }}
                 </flux:button>
             </div>
         </div>

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\LeadAssigned;
 use App\Models\CallCenter;
 use App\Models\Lead;
 use App\Models\User;
@@ -320,6 +321,9 @@ class LeadDistributionService
         $lead->refresh();
 
         if ($saved) {
+            // Dispatch LeadAssigned event for webhooks
+            event(new LeadAssigned($lead, $agent));
+
             // Log the assignment
             try {
                 $this->auditService->logLeadAssigned($lead, $agent);

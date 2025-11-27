@@ -17,6 +17,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => \App\Http\Middleware\EnsureUserHasRole::class,
         ]);
 
+        // Vérifier que les utilisateurs connectés sont actifs
+        $middleware->web(append: [
+            \App\Http\Middleware\EnsureUserIsActive::class,
+        ]);
+
         $middleware->validateCsrfTokens(except: [
             'forms/*/submit',
         ]);
@@ -27,6 +32,16 @@ return Application::configure(basePath: dirname(__DIR__))
             ->everyFiveMinutes()
             ->withoutOverlapping()
             ->runInBackground();
+
+        // Send reminder notifications every hour
+        $schedule->command('reminders:notify')
+            ->hourly()
+            ->withoutOverlapping();
+
+        // Check alerts every 15 minutes
+        $schedule->command('alerts:check')
+            ->everyFifteenMinutes()
+            ->withoutOverlapping();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

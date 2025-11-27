@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Lead;
+use App\Models\Tag;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Volt\Component;
@@ -11,7 +12,12 @@ new class extends Component
     use WithPagination;
 
     public string $search = '';
+
     public string $statusFilter = '';
+
+    public array $tagsFilter = [];
+
+    public string $tagsMode = 'any';
 
     public function mount(): void
     {
@@ -31,13 +37,13 @@ new class extends Component
     public function getLeadsProperty()
     {
         $supervisor = Auth::user();
-        
+
         // Récupérer tous les agents sous la supervision
         $agentIds = User::where('supervisor_id', $supervisor->id)
-            ->whereHas('role', fn($q) => $q->where('slug', 'agent'))
+            ->whereHas('role', fn ($q) => $q->where('slug', 'agent'))
             ->pluck('id');
 
-        return Lead::whereIn('assigned_to', $agentIds)
+        $query = Lead::whereIn('assigned_to', $agentIds)
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
                     $q->where('email', 'like', '%'.$this->search.'%')
@@ -47,9 +53,33 @@ new class extends Component
             ->when($this->statusFilter, function ($query) {
                 $query->where('status', $this->statusFilter);
             })
-            ->with(['form', 'assignedAgent'])
-            ->latest()
-            ->paginate(15);
+            ->when(! empty($this->tagsFilter), function ($query) {
+                $tagIds = array_filter(array_map('intval', $this->tagsFilter));
+                if (! empty($tagIds)) {
+                    if ($this->tagsMode === 'all') {
+                        foreach ($tagIds as $tagId) {
+                            $query->whereHas('tags', fn ($q) => $q->where('tags.id', $tagId));
+                        }
+                    } else {
+                        $query->whereHas('tags', fn ($q) => $q->whereIn('tags.id', $tagIds));
+                    }
+                }
+            })
+            ->with(['form', 'assignedAgent', 'tags']);
+
+        return $query->latest()->paginate(15);
+    }
+
+    public function getTagsProperty()
+    {
+        $supervisor = Auth::user();
+        $agentIds = User::where('supervisor_id', $supervisor->id)
+            ->whereHas('role', fn ($q) => $q->where('slug', 'agent'))
+            ->pluck('id');
+
+        return Tag::whereHas('leads', fn ($q) => $q->whereIn('assigned_to', $agentIds))
+            ->orderBy('name')
+            ->get();
     }
 }; ?>
 
@@ -64,21 +94,81 @@ new class extends Component
     </div>
 
     <!-- Filtres -->
-    <div class="flex flex-col gap-4 sm:flex-row">
+    <div class="flex flex-col gap-4">
         <flux:input
             wire:model.live.debounce.300ms="search"
             :label="__('Rechercher')"
             placeholder="{{ __('Email, nom...') }}"
-            class="flex-1"
+            class="w-full"
         />
-        <flux:select wire:model.live="statusFilter" :label="__('Statut')" class="sm:w-48">
-            <option value="">{{ __('Tous les statuts') }}</option>
-            <option value="pending_email">{{ __('En attente email') }}</option>
-            <option value="email_confirmed">{{ __('Email confirmé') }}</option>
-            <option value="pending_call">{{ __('En attente d\'appel') }}</option>
-            <option value="confirmed">{{ __('Confirmé') }}</option>
-            <option value="rejected">{{ __('Rejeté') }}</option>
-        </flux:select>
+        
+        <!-- Nuage de tags pour les statuts -->
+        <div>
+            <label class="mb-2 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                {{ __('Filtrer par statut') }}
+            </label>
+            <div class="flex flex-wrap gap-2">
+                <button
+                    wire:click="$set('statusFilter', '')"
+                    type="button"
+                    class="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition-all {{ empty($statusFilter) ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-500 ring-offset-2' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700' }}"
+                >
+                    {{ __('Tous') }}
+                </button>
+                @foreach (\App\LeadStatus::cases() as $status)
+                    @php
+                        $isActive = $statusFilter === $status->value;
+                        $statusEnum = $status;
+                    @endphp
+                    <button
+                        wire:click="$set('statusFilter', '{{ $status->value }}')"
+                        type="button"
+                        class="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition-all {{ $isActive ? 'shadow-md ring-2 ring-offset-2 ' . str_replace('bg-', 'ring-', explode(' ', $statusEnum->colorClass())[0]) . ' ' . $statusEnum->colorClass() : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700' }}"
+                    >
+                        {{ $status->label() }}
+                    </button>
+                @endforeach
+            </div>
+        </div>
+
+        <!-- Filtres par tags -->
+        @if ($this->tags->count() > 0)
+            <div>
+                <label class="mb-2 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                    {{ __('Filtrer par tags') }}
+                </label>
+                <div class="flex flex-wrap gap-2">
+                    @foreach ($this->tags as $tag)
+                        @php
+                            $isSelected = in_array($tag->id, $tagsFilter);
+                        @endphp
+                        <button
+                            wire:click="
+                                @if($isSelected)
+                                    $set('tagsFilter', array_values(array_diff($tagsFilter, [{{ $tag->id }}])))
+                                @else
+                                    $set('tagsFilter', array_merge($tagsFilter, [{{ $tag->id }}]))
+                                @endif
+                            "
+                            type="button"
+                            class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-all {{ $isSelected ? 'ring-2 ring-offset-2' : '' }}"
+                            style="{{ $isSelected ? 'background-color: ' . $tag->color . '20; color: ' . $tag->color . '; ring-color: ' . $tag->color : 'background-color: #f3f4f6; color: #6b7280' }}"
+                        >
+                            <div class="h-2 w-2 rounded-full" style="background-color: {{ $tag->color }};"></div>
+                            {{ $tag->name }}
+                        </button>
+                    @endforeach
+                </div>
+                @if (!empty($tagsFilter))
+                    <div class="mt-2">
+                        <flux:select wire:model.live="tagsMode" size="sm">
+                            <option value="any">{{ __('Leads avec n\'importe lequel des tags sélectionnés') }}</option>
+                            <option value="all">{{ __('Leads avec tous les tags sélectionnés') }}</option>
+                        </flux:select>
+                    </div>
+                @endif
+            </div>
+        @endif
     </div>
 
     <!-- Liste des leads -->
@@ -88,13 +178,16 @@ new class extends Component
                 <thead class="border-b border-neutral-200 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900">
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-                            {{ __('Email') }}
+                            {{ __('Lead') }}
                         </th>
                         <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                             {{ __('Formulaire') }}
                         </th>
                         <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                             {{ __('Agent') }}
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                            {{ __('Tags') }}
                         </th>
                         <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                             {{ __('Statut') }}
@@ -107,14 +200,47 @@ new class extends Component
                 <tbody class="divide-y divide-neutral-200 bg-white dark:divide-neutral-700 dark:bg-neutral-800">
                     @forelse ($this->leads as $lead)
                         <tr>
-                            <td class="whitespace-nowrap px-6 py-4 text-sm text-neutral-900 dark:text-neutral-100">
-                                {{ $lead->email }}
+                            <td class="px-6 py-4">
+                                @php
+                                    $phone = $lead->phone ?? data_get($lead->data, 'phone');
+                                    $fullName = $lead->data['name']
+                                        ?? trim(($lead->data['first_name'] ?? '') . ' ' . ($lead->data['last_name'] ?? ''));
+                                    $fullName = $fullName ?: $lead->email;
+                                @endphp
+                                <div class="flex flex-col gap-1">
+                                    <span class="text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">
+                                        #{{ $lead->id }}
+                                    </span>
+                                    <span class="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                                        {{ $fullName }}
+                                    </span>
+                                    <span class="text-xs text-neutral-500 dark:text-neutral-400">
+                                        {{ $lead->email }}
+                                    </span>
+                                    @if ($phone)
+                                        <span class="text-xs text-neutral-500 dark:text-neutral-400 flex items-center gap-1">
+                                            📞 <span>{{ $phone }}</span>
+                                        </span>
+                                    @endif
+                                </div>
                             </td>
                             <td class="whitespace-nowrap px-6 py-4 text-sm text-neutral-600 dark:text-neutral-400">
                                 {{ $lead->form?->name ?? 'N/A' }}
                             </td>
                             <td class="whitespace-nowrap px-6 py-4 text-sm text-neutral-600 dark:text-neutral-400">
                                 {{ $lead->assignedAgent?->name ?? 'Non assigné' }}
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="flex flex-wrap gap-1.5">
+                                    @forelse ($lead->tags as $tag)
+                                        <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium" style="background-color: {{ $tag->color }}20; color: {{ $tag->color }};">
+                                            <div class="h-1.5 w-1.5 rounded-full" style="background-color: {{ $tag->color }};"></div>
+                                            {{ $tag->name }}
+                                        </span>
+                                    @empty
+                                        <span class="text-xs text-neutral-400 dark:text-neutral-500">{{ __('Aucun tag') }}</span>
+                                    @endforelse
+                                </div>
                             </td>
                             <td class="whitespace-nowrap px-6 py-4 text-sm">
                                 @php
@@ -130,7 +256,7 @@ new class extends Component
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-6 py-12 text-center text-sm text-neutral-500 dark:text-neutral-400">
+                            <td colspan="6" class="px-6 py-12 text-center text-sm text-neutral-500 dark:text-neutral-400">
                                 {{ __('Aucun lead trouvé') }}
                             </td>
                         </tr>

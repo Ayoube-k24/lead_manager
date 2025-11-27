@@ -2,10 +2,15 @@
 
 namespace App\Models;
 
+use App\Events\LeadConverted;
+use App\Events\LeadEmailConfirmed;
+use App\Events\LeadStatusUpdated;
 use App\LeadStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Lead extends Model
 {
@@ -29,6 +34,9 @@ class Lead extends Model
         'call_center_id',
         'call_comment',
         'called_at',
+        'score',
+        'score_updated_at',
+        'score_factors',
     ];
 
     /**
@@ -43,6 +51,8 @@ class Lead extends Model
             'email_confirmed_at' => 'datetime',
             'email_confirmation_token_expires_at' => 'datetime',
             'called_at' => 'datetime',
+            'score_updated_at' => 'datetime',
+            'score_factors' => 'array',
         ];
     }
 
@@ -68,6 +78,72 @@ class Lead extends Model
     public function callCenter(): BelongsTo
     {
         return $this->belongsTo(CallCenter::class);
+    }
+
+    /**
+     * Get the notes for this lead.
+     */
+    public function notes(): HasMany
+    {
+        return $this->hasMany(LeadNote::class);
+    }
+
+    /**
+     * Get the reminders for this lead.
+     */
+    public function reminders(): HasMany
+    {
+        return $this->hasMany(LeadReminder::class);
+    }
+
+    /**
+     * Get the tags for this lead.
+     */
+    public function tags(): BelongsToMany
+    {
+        return $this->belongsToMany(Tag::class, 'lead_tag')
+            ->withPivot('user_id')
+            ->withTimestamps();
+    }
+
+    /**
+     * Get the score priority level.
+     */
+    public function getScorePriority(): string
+    {
+        $score = $this->score ?? 0;
+
+        if ($score >= 80) {
+            return 'high';
+        } elseif ($score >= 60) {
+            return 'medium';
+        }
+
+        return 'low';
+    }
+
+    /**
+     * Get the score badge color class.
+     */
+    public function getScoreBadgeColor(): string
+    {
+        return match ($this->getScorePriority()) {
+            'high' => 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400',
+            'medium' => 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400',
+            default => 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400',
+        };
+    }
+
+    /**
+     * Get the score label.
+     */
+    public function getScoreLabel(): string
+    {
+        return match ($this->getScorePriority()) {
+            'high' => __('Priorité haute'),
+            'medium' => __('Priorité moyenne'),
+            default => __('Priorité basse'),
+        };
     }
 
     /**
@@ -145,6 +221,9 @@ class Lead extends Model
         // Use save() to trigger Observer
         $this->save();
 
+        // Dispatch LeadEmailConfirmed event for webhooks
+        event(new LeadEmailConfirmed($this));
+
         \Log::info('Lead email confirmed via confirmEmail()', [
             'lead_id' => $this->id,
             'status' => $this->status,
@@ -189,6 +268,14 @@ class Lead extends Model
             $this->call_comment = $comment;
         }
         $this->save();
+
+        // Dispatch LeadStatusUpdated event for webhooks
+        event(new LeadStatusUpdated($this, $oldStatus, $status->value));
+
+        // Dispatch LeadConverted event if status is converted
+        if ($status === LeadStatus::Converted) {
+            event(new LeadConverted($this));
+        }
 
         // Log the status update
         try {

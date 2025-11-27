@@ -205,4 +205,42 @@ enum LeadStatus: string
 
         return $options;
     }
+
+    /**
+     * Get a description/guide for the status.
+     */
+    public function description(): string
+    {
+        return match ($this) {
+            self::PendingEmail => __('Le prospect doit confirmer son email. Aucune action requise pour le moment.'),
+            self::EmailConfirmed => __('Le prospect a confirmé son email. Il sera bientôt attribué à un agent.'),
+            self::PendingCall => __('Ce lead vous a été attribué. Contactez le prospect par téléphone.'),
+            self::Confirmed => __('Le prospect est intéressé par votre offre. Continuez le suivi.'),
+            self::Rejected => __('Le prospect a refusé l\'offre de manière générale.'),
+            self::CallbackPending => __('Un rappel a été programmé. Contactez le prospect à la date prévue.'),
+            self::NoAnswer => __('Aucune réponse lors de l\'appel. Réessayez plus tard.'),
+            self::Busy => __('La ligne était occupée. Réessayez dans quelques minutes.'),
+            self::WrongNumber => __('Le numéro de téléphone est incorrect ou invalide.'),
+            self::NotInterested => __('Le prospect a clairement exprimé son désintérêt.'),
+            self::Qualified => __('Le prospect répond aux critères de qualification. Bon potentiel.'),
+            self::Converted => __('Félicitations ! Le prospect est devenu client.'),
+            self::FollowUp => __('Une relance est nécessaire pour finaliser la vente.'),
+            self::AppointmentScheduled => __('Un rendez-vous commercial a été confirmé avec le prospect.'),
+            self::QuoteSent => __('Un devis a été envoyé au prospect. Attendez sa réponse.'),
+            self::DoNotCall => __('Le prospect a demandé à ne plus être contacté. Respectez sa demande.'),
+        };
+    }
+
+    /**
+     * Get recommended statuses for beginners (simplified list).
+     */
+    public static function beginnerStatuses(): array
+    {
+        return [
+            self::Qualified,
+            self::NotInterested,
+            self::CallbackPending,
+            self::NoAnswer,
+        ];
+    }
 }

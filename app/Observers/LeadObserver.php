@@ -4,12 +4,14 @@ namespace App\Observers;
 
 use App\Models\Lead;
 use App\Services\LeadDistributionService;
+use App\Services\LeadScoringService;
 use Illuminate\Support\Facades\Log;
 
 class LeadObserver
 {
     public function __construct(
-        protected LeadDistributionService $distributionService
+        protected LeadDistributionService $distributionService,
+        protected LeadScoringService $scoringService
     ) {}
 
     /**
@@ -18,6 +20,7 @@ class LeadObserver
     public function updated(Lead $lead): void
     {
         $this->attemptDistribution($lead);
+        $this->recalculateScoreIfNeeded($lead, 'updated');
     }
 
     /**
@@ -163,5 +166,61 @@ class LeadObserver
     public function created(Lead $lead): void
     {
         // No distribution on creation, only after email confirmation
+        $this->recalculateScoreIfNeeded($lead, 'created');
+    }
+
+    /**
+     * Recalculate score if needed based on configuration.
+     */
+    protected function recalculateScoreIfNeeded(Lead $lead, string $event): void
+    {
+        $config = config('lead-scoring.auto_recalculate', []);
+
+        $shouldRecalculate = match ($event) {
+            'created' => $config['on_creation'] ?? true,
+            'updated' => $this->shouldRecalculateOnUpdate($lead, $config),
+            default => false,
+        };
+
+        if ($shouldRecalculate) {
+            try {
+                // Load necessary relationships before calculation
+                $lead->loadMissing(['form', 'notes', 'reminders', 'tags']);
+                
+                $this->scoringService->updateScore($lead);
+                Log::debug('Lead score recalculated', [
+                    'lead_id' => $lead->id,
+                    'event' => $event,
+                    'score' => $lead->fresh()->score,
+                ]);
+            } catch (\Exception $e) {
+                Log::error('Error recalculating lead score', [
+                    'lead_id' => $lead->id,
+                    'event' => $event,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Check if score should be recalculated on update.
+     */
+    protected function shouldRecalculateOnUpdate(Lead $lead, array $config): bool
+    {
+        $changes = $lead->getChanges();
+
+        // Recalculate on email confirmation
+        if (($config['on_email_confirmation'] ?? true) && isset($changes['email_confirmed_at'])) {
+            return true;
+        }
+
+        // Recalculate on status change
+        if (($config['on_status_change'] ?? true) && isset($changes['status'])) {
+            return true;
+        }
+
+        return false;
     }
 }

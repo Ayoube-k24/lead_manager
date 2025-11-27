@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\LeadCreated;
 use App\Jobs\SendLeadConfirmationEmail;
 use App\Models\Form;
 use App\Services\FormValidationService;
@@ -84,6 +85,9 @@ class PublicFormController extends Controller
             'email_confirmation_token_expires_at' => now()->addHours(24),
             'call_center_id' => $form->call_center_id,
         ]);
+
+        // Dispatch LeadCreated event for webhooks
+        event(new LeadCreated($lead));
 
         // Dispatch confirmation email job to queue
         // The email will be sent asynchronously and will retry automatically if SMTP fails

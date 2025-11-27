@@ -145,14 +145,39 @@ new class extends Component {
             {{ __('Veuillez sélectionner un centre d\'appels ci-dessus pour voir ses leads et statistiques.') }}
         </flux:callout>
     @else
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-end">
-            <div class="grid gap-3 md:grid-cols-2">
-                <flux:select wire:model.live="statusFilter" :label="__('Filtrer par statut')">
-                    @foreach ($statusOptions as $option)
-                        <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
+        <div class="flex flex-col gap-4">
+            <!-- Nuage de tags pour les statuts -->
+            <div>
+                <label class="mb-2 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                    {{ __('Filtrer par statut') }}
+                </label>
+                <div class="flex flex-wrap gap-2">
+                    <button
+                        wire:click="$set('statusFilter', '')"
+                        type="button"
+                        class="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition-all {{ empty($statusFilter) ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-500 ring-offset-2' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700' }}"
+                    >
+                        {{ __('Tous') }}
+                    </button>
+                    @foreach (\App\LeadStatus::cases() as $status)
+                        @php
+                            $isActive = $statusFilter === $status->value;
+                            $statusEnum = $status;
+                        @endphp
+                        <button
+                            wire:click="$set('statusFilter', '{{ $status->value }}')"
+                            type="button"
+                            class="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition-all {{ $isActive ? 'shadow-md ring-2 ring-offset-2 ' . str_replace('bg-', 'ring-', explode(' ', $statusEnum->colorClass())[0]) . ' ' . $statusEnum->colorClass() : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700' }}"
+                        >
+                            {{ $status->label() }}
+                        </button>
                     @endforeach
-                </flux:select>
-                <flux:select wire:model.live="leadLimit" :label="__('Nombre de leads récents')">
+                </div>
+            </div>
+            
+            <!-- Limite de leads -->
+            <div class="flex items-end justify-end">
+                <flux:select wire:model.live="leadLimit" :label="__('Nombre de leads récents')" class="w-full sm:w-48">
                     @foreach ($leadLimitOptions as $limit)
                         <option value="{{ $limit }}">{{ $limit }}</option>
                     @endforeach
@@ -238,12 +263,28 @@ new class extends Component {
                                         @endphp
                                         <tr>
                                             <td class="px-4 py-3">
-                                                <div class="font-medium text-neutral-900 dark:text-neutral-50">
-                                                    {{ $lead->data['name'] ?? $lead->email }}
+                                                @php
+                                                    $phone = $lead->phone ?? data_get($lead->data, 'phone');
+                                                    $fullName = $lead->data['name']
+                                                        ?? trim(($lead->data['first_name'] ?? '') . ' ' . ($lead->data['last_name'] ?? ''));
+                                                    $fullName = $fullName ?: $lead->email;
+                                                @endphp
+                                                <div class="flex flex-col gap-1">
+                                                    <span class="text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">
+                                                        #{{ $lead->id }}
+                                                    </span>
+                                                    <div class="font-medium text-neutral-900 dark:text-neutral-50">
+                                                        {{ $fullName }}
+                                                    </div>
+                                                    <p class="text-xs text-neutral-500 dark:text-neutral-400">
+                                                        {{ $lead->email }}
+                                                    </p>
+                                                    @if ($phone)
+                                                        <p class="text-xs text-neutral-500 dark:text-neutral-400 flex items-center gap-1">
+                                                            📞 <span>{{ $phone }}</span>
+                                                        </p>
+                                                    @endif
                                                 </div>
-                                                <p class="text-xs text-neutral-500 dark:text-neutral-400">
-                                                    {{ $lead->email }}
-                                                </p>
                                             </td>
                                             <td class="px-4 py-3 text-neutral-800 dark:text-neutral-200">
                                                 {{ $lead->form?->name ?? __('Sans formulaire') }}

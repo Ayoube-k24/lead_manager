@@ -114,11 +114,11 @@ class UserSeeder extends Seeder
             $this->command->line('  ⏭️  Superviseur existe déjà');
         }
 
-        // Créer les agents
+        // Créer les agents avec différents niveaux d'expérience
         $agents = [
-            ['name' => 'Agent 1', 'email' => 'agent1@leadmanager.com'],
-            ['name' => 'Agent 2', 'email' => 'agent2@leadmanager.com'],
-            ['name' => 'Agent 3', 'email' => 'agent3@leadmanager.com'],
+            ['name' => 'Agent 1', 'email' => 'agent1@leadmanager.com', 'experience_level' => 'beginner'],
+            ['name' => 'Agent 2', 'email' => 'agent2@leadmanager.com', 'experience_level' => 'intermediate'],
+            ['name' => 'Agent 3', 'email' => 'agent3@leadmanager.com', 'experience_level' => 'advanced'],
         ];
 
         foreach ($agents as $index => $agentData) {
@@ -134,9 +134,15 @@ class UserSeeder extends Seeder
                     'role_id' => $agentRole->id,
                     'call_center_id' => $callCenter->id,
                     'supervisor_id' => $supervisorId,
+                    'experience_level' => $agentData['experience_level'],
                     'email_verified_at' => now(),
                 ]
             );
+
+            // Mettre à jour le niveau d'expérience si l'agent existe déjà
+            if (! $agent->wasRecentlyCreated && $agent->experience_level !== $agentData['experience_level']) {
+                $agent->update(['experience_level' => $agentData['experience_level']]);
+            }
 
             // Si l'agent existe déjà mais n'a pas de superviseur, l'assigner
             if (! $agent->wasRecentlyCreated && $supervisorId && ! $agent->supervisor_id) {
@@ -160,7 +166,10 @@ class UserSeeder extends Seeder
         $this->command->line('  • Super Admin: admin@leadmanager.com / password');
         $this->command->line('  • Propriétaire: owner@leadmanager.com / password');
         $this->command->line('  • Superviseur: supervisor@leadmanager.com / password');
-        $this->command->line('  • Agents: agent1@leadmanager.com, agent2@leadmanager.com, agent3@leadmanager.com / password');
+        $this->command->line('  • Agents:');
+        $this->command->line('    - agent1@leadmanager.com / password (Débutant)');
+        $this->command->line('    - agent2@leadmanager.com / password (Intermédiaire)');
+        $this->command->line('    - agent3@leadmanager.com / password (Avancé)');
         $this->command->line('    (agent1 et agent2 sont supervisés par le superviseur)');
     }
 

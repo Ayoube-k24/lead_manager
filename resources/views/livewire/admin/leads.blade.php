@@ -3,6 +3,9 @@
 use App\Models\CallCenter;
 use App\Models\Form;
 use App\Models\Lead;
+use App\Models\Tag;
+use App\Models\User;
+use App\Services\LeadSearchService;
 use Illuminate\Http\Request;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
@@ -12,9 +15,38 @@ new class extends Component
     use WithPagination;
 
     public string $search = '';
-    public string $statusFilter = '';
+
+    public array $statusFilter = [];
+
     public ?int $callCenterFilter = null;
+
     public ?int $formFilter = null;
+
+    public ?int $assignedToFilter = null;
+
+    public ?string $createdFrom = null;
+
+    public ?string $createdTo = null;
+
+    public ?string $emailConfirmedFrom = null;
+
+    public ?string $emailConfirmedTo = null;
+
+    public ?string $calledFrom = null;
+
+    public ?string $calledTo = null;
+
+    public ?bool $emailConfirmed = null;
+
+    public ?bool $hasNotes = null;
+
+    public array $tagsFilter = [];
+
+    public string $tagsMode = 'any';
+
+    public ?bool $noTags = null;
+
+    public bool $showAdvancedFilters = false;
 
     public function mount(Request $request): void
     {
@@ -46,27 +78,30 @@ new class extends Component
 
     public function getLeadsProperty()
     {
-        return Lead::query()
-            ->when($this->search, function ($query) {
-                $query->where(function ($q) {
-                    $q->where('email', 'like', '%'.$this->search.'%')
-                        ->orWhereJsonContains('data->name', $this->search)
-                        ->orWhereJsonContains('data->first_name', $this->search)
-                        ->orWhereJsonContains('data->last_name', $this->search);
-                });
-            })
-            ->when($this->statusFilter, function ($query) {
-                $query->where('status', $this->statusFilter);
-            })
-            ->when($this->callCenterFilter, function ($query) {
-                $query->where('call_center_id', $this->callCenterFilter);
-            })
-            ->when($this->formFilter, function ($query) {
-                $query->where('form_id', $this->formFilter);
-            })
-            ->with(['form', 'callCenter', 'assignedAgent'])
-            ->latest()
-            ->paginate(20);
+        $service = app(LeadSearchService::class);
+
+        $filters = [
+            'status' => ! empty($this->statusFilter) ? $this->statusFilter : null,
+            'call_center_id' => $this->callCenterFilter,
+            'form_id' => $this->formFilter,
+            'assigned_to' => $this->assignedToFilter,
+            'created_from' => $this->createdFrom,
+            'created_to' => $this->createdTo,
+            'email_confirmed_from' => $this->emailConfirmedFrom,
+            'email_confirmed_to' => $this->emailConfirmedTo,
+            'called_from' => $this->calledFrom,
+            'called_to' => $this->calledTo,
+            'email_confirmed' => $this->emailConfirmed,
+            'has_notes' => $this->hasNotes,
+            'tags' => ! empty($this->tagsFilter) ? $this->tagsFilter : null,
+            'tags_mode' => $this->tagsMode,
+            'no_tags' => $this->noTags,
+        ];
+
+        // Remove null values
+        $filters = array_filter($filters, fn ($value) => $value !== null && $value !== '' && $value !== []);
+
+        return $service->search($this->search, $filters, 20);
     }
 
     public function getCallCentersProperty()
@@ -77,6 +112,44 @@ new class extends Component
     public function getFormsProperty()
     {
         return Form::orderBy('name')->get();
+    }
+
+    public function getAgentsProperty()
+    {
+        return User::whereHas('role', fn ($q) => $q->where('slug', 'agent'))
+            ->orderBy('name')
+            ->get();
+    }
+
+    public function getTagsProperty()
+    {
+        return Tag::orderBy('name')->get();
+    }
+
+    public function toggleAdvancedFilters(): void
+    {
+        $this->showAdvancedFilters = ! $this->showAdvancedFilters;
+    }
+
+    public function clearFilters(): void
+    {
+        $this->search = '';
+        $this->statusFilter = [];
+        $this->callCenterFilter = null;
+        $this->formFilter = null;
+        $this->assignedToFilter = null;
+        $this->createdFrom = null;
+        $this->createdTo = null;
+        $this->emailConfirmedFrom = null;
+        $this->emailConfirmedTo = null;
+        $this->calledFrom = null;
+        $this->calledTo = null;
+        $this->emailConfirmed = null;
+        $this->hasNotes = null;
+        $this->tagsFilter = [];
+        $this->tagsMode = 'any';
+        $this->noTags = null;
+        $this->resetPage();
     }
 
     public function getStatsProperty(): array
@@ -136,33 +209,147 @@ new class extends Component
     </div>
 
     <!-- Filtres -->
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <flux:input
-            wire:model.live.debounce.300ms="search"
-            :label="__('Rechercher')"
-            placeholder="{{ __('Email, nom...') }}"
-        />
-        <flux:select wire:model.live="statusFilter" :label="__('Statut')">
-            <option value="">{{ __('Tous les statuts') }}</option>
-            <option value="pending_email">{{ __('En attente email') }}</option>
-            <option value="email_confirmed">{{ __('Email confirmé') }}</option>
-            <option value="pending_call">{{ __('En attente d\'appel') }}</option>
-            <option value="confirmed">{{ __('Confirmé') }}</option>
-            <option value="rejected">{{ __('Rejeté') }}</option>
-            <option value="callback_pending">{{ __('En attente de rappel') }}</option>
-        </flux:select>
-        <flux:select wire:model.live="callCenterFilter" :label="__('Centre d\'appels')">
-            <option value="">{{ __('Tous les centres') }}</option>
-            @foreach ($this->callCenters as $callCenter)
-                <option value="{{ $callCenter->id }}">{{ $callCenter->name }}</option>
-            @endforeach
-        </flux:select>
-        <flux:select wire:model.live="formFilter" :label="__('Formulaire')">
-            <option value="">{{ __('Tous les formulaires') }}</option>
-            @foreach ($this->forms as $form)
-                <option value="{{ $form->id }}">{{ $form->name }}</option>
-            @endforeach
-        </flux:select>
+    <div class="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
+        <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold">{{ __('Recherche et Filtres') }}</h3>
+            <div class="flex items-center gap-2">
+                @if ($search || !empty($statusFilter) || $callCenterFilter || $formFilter || $assignedToFilter || $createdFrom || $createdTo || $emailConfirmedFrom || $emailConfirmedTo || $calledFrom || $calledTo || $emailConfirmed !== null || $hasNotes !== null || !empty($tagsFilter) || $noTags !== null)
+                    <flux:button wire:click="clearFilters" variant="ghost" size="sm" icon="x-mark">
+                        {{ __('Réinitialiser') }}
+                    </flux:button>
+                @endif
+                <flux:button wire:click="toggleAdvancedFilters" variant="ghost" size="sm" icon="{{ $showAdvancedFilters ? 'chevron-up' : 'chevron-down' }}">
+                    {{ $showAdvancedFilters ? __('Masquer les filtres avancés') : __('Afficher les filtres avancés') }}
+                </flux:button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <flux:input
+                wire:model.live.debounce.300ms="search"
+                :label="__('Recherche')"
+                placeholder="{{ __('Email, nom, téléphone...') }}"
+                icon="magnifying-glass"
+            />
+            <flux:select wire:model.live="callCenterFilter" :label="__('Centre d\'appels')">
+                <option value="">{{ __('Tous les centres') }}</option>
+                @foreach ($this->callCenters as $callCenter)
+                    <option value="{{ $callCenter->id }}">{{ $callCenter->name }}</option>
+                @endforeach
+            </flux:select>
+            <flux:select wire:model.live="formFilter" :label="__('Formulaire')">
+                <option value="">{{ __('Tous les formulaires') }}</option>
+                @foreach ($this->forms as $form)
+                    <option value="{{ $form->id }}">{{ $form->name }}</option>
+                @endforeach
+            </flux:select>
+        </div>
+        
+        <!-- Nuage de tags pour les statuts -->
+        <div>
+            <label class="mb-2 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                {{ __('Statuts') }}
+            </label>
+            <div class="flex flex-wrap gap-2">
+                @foreach (\App\LeadStatus::cases() as $status)
+                    @php
+                        $isActive = in_array($status->value, $statusFilter);
+                        $statusEnum = $status;
+                    @endphp
+                    <button
+                        wire:click="
+                            @if($isActive)
+                                $set('statusFilter', array_values(array_diff($statusFilter, ['{{ $status->value }}'])))
+                            @else
+                                $set('statusFilter', array_merge($statusFilter, ['{{ $status->value }}']))
+                            @endif
+                        "
+                        type="button"
+                        class="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition-all {{ $isActive ? 'shadow-md ring-2 ring-offset-2 ' . str_replace('bg-', 'ring-', explode(' ', $statusEnum->colorClass())[0]) . ' ' . $statusEnum->colorClass() : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700' }}"
+                    >
+                        {{ $status->label() }}
+                    </button>
+                @endforeach
+            </div>
+        </div>
+
+        <!-- Filtres avancés -->
+        @if ($showAdvancedFilters)
+            <div class="border-t border-neutral-200 pt-4 dark:border-neutral-700">
+                <h4 class="mb-4 text-sm font-semibold text-neutral-700 dark:text-neutral-300">{{ __('Filtres avancés') }}</h4>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <flux:select wire:model.live="assignedToFilter" :label="__('Agent assigné')">
+                        <option value="">{{ __('Tous les agents') }}</option>
+                        @foreach ($this->agents as $agent)
+                            <option value="{{ $agent->id }}">{{ $agent->name }}</option>
+                        @endforeach
+                    </flux:select>
+                    <flux:input wire:model.live="createdFrom" type="date" :label="__('Créé depuis')" />
+                    <flux:input wire:model.live="createdTo" type="date" :label="__('Créé jusqu\'au')" />
+                    <flux:input wire:model.live="emailConfirmedFrom" type="date" :label="__('Email confirmé depuis')" />
+                    <flux:input wire:model.live="emailConfirmedTo" type="date" :label="__('Email confirmé jusqu\'au')" />
+                    <flux:input wire:model.live="calledFrom" type="date" :label="__('Appelé depuis')" />
+                    <flux:input wire:model.live="calledTo" type="date" :label="__('Appelé jusqu\'au')" />
+                    <flux:select wire:model.live="emailConfirmed" :label="__('Email confirmé')">
+                        <option value="">{{ __('Tous') }}</option>
+                        <option value="1">{{ __('Oui') }}</option>
+                        <option value="0">{{ __('Non') }}</option>
+                    </flux:select>
+                    <flux:select wire:model.live="hasNotes" :label="__('A des notes')">
+                        <option value="">{{ __('Tous') }}</option>
+                        <option value="1">{{ __('Oui') }}</option>
+                        <option value="0">{{ __('Non') }}</option>
+                    </flux:select>
+                </div>
+            </div>
+        @endif
+
+        <!-- Filtres par tags -->
+        <div class="border-t border-neutral-200 pt-4 dark:border-neutral-700">
+            <h4 class="mb-4 text-sm font-semibold text-neutral-700 dark:text-neutral-300">{{ __('Filtres par tags') }}</h4>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                    <flux:label class="mb-2">{{ __('Tags') }}</flux:label>
+                    <div class="flex flex-wrap gap-2">
+                        @foreach ($this->tags as $tag)
+                            @php
+                                $isSelected = in_array($tag->id, $tagsFilter);
+                            @endphp
+                            <button
+                                wire:click="
+                                    @if($isSelected)
+                                        $set('tagsFilter', array_values(array_diff($tagsFilter, [{{ $tag->id }}])))
+                                    @else
+                                        $set('tagsFilter', array_merge($tagsFilter, [{{ $tag->id }}]))
+                                    @endif
+                                "
+                                type="button"
+                                class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-all {{ $isSelected ? 'ring-2 ring-offset-2' : '' }}"
+                                style="{{ $isSelected ? 'background-color: ' . $tag->color . '20; color: ' . $tag->color . '; ring-color: ' . $tag->color : 'background-color: #f3f4f6; color: #6b7280' }}"
+                            >
+                                <div class="h-2 w-2 rounded-full" style="background-color: {{ $tag->color }};"></div>
+                                {{ $tag->name }}
+                            </button>
+                        @endforeach
+                    </div>
+                    @if (!empty($tagsFilter))
+                        <div class="mt-2">
+                            <flux:select wire:model.live="tagsMode" size="sm">
+                                <option value="any">{{ __('Leads avec n\'importe lequel des tags sélectionnés') }}</option>
+                                <option value="all">{{ __('Leads avec tous les tags sélectionnés') }}</option>
+                            </flux:select>
+                        </div>
+                    @endif
+                </div>
+                <div>
+                    <flux:select wire:model.live="noTags" :label="__('Sans tags')">
+                        <option value="">{{ __('Tous') }}</option>
+                        <option value="1">{{ __('Oui (uniquement les leads sans tags)') }}</option>
+                        <option value="0">{{ __('Non (uniquement les leads avec tags)') }}</option>
+                    </flux:select>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Liste des leads -->
@@ -172,10 +359,16 @@ new class extends Component
                 <thead class="border-b border-neutral-200 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900">
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                            {{ __('ID Lead') }}
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                             {{ __('Email') }}
                         </th>
                         <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                             {{ __('Nom') }}
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                            {{ __('Téléphone') }}
                         </th>
                         <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                             {{ __('Formulaire') }}
@@ -200,11 +393,23 @@ new class extends Component
                 <tbody class="divide-y divide-neutral-200 bg-white dark:divide-neutral-700 dark:bg-neutral-800">
                     @forelse ($this->leads as $lead)
                         <tr>
+                            @php
+                                $phone = $lead->phone ?? data_get($lead->data, 'phone');
+                                $fullName = $lead->data['name']
+                                    ?? trim(($lead->data['first_name'] ?? '') . ' ' . ($lead->data['last_name'] ?? ''));
+                                $fullName = $fullName ?: __('Non renseigné');
+                            @endphp
+                            <td class="whitespace-nowrap px-6 py-4 text-xs font-semibold text-neutral-500 dark:text-neutral-400">
+                                #{{ $lead->id }}
+                            </td>
                             <td class="whitespace-nowrap px-6 py-4 text-sm text-neutral-900 dark:text-neutral-100">
                                 {{ $lead->email }}
                             </td>
                             <td class="whitespace-nowrap px-6 py-4 text-sm text-neutral-900 dark:text-neutral-100">
-                                {{ $lead->data['name'] ?? $lead->data['first_name'] ?? 'N/A' }}
+                                {{ $fullName }}
+                            </td>
+                            <td class="whitespace-nowrap px-6 py-4 text-sm text-neutral-900 dark:text-neutral-100">
+                                {{ $phone ?? __('Non renseigné') }}
                             </td>
                             <td class="whitespace-nowrap px-6 py-4 text-sm text-neutral-600 dark:text-neutral-400">
                                 {{ $lead->form?->name ?? 'N/A' }}
@@ -253,7 +458,7 @@ new class extends Component
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="px-6 py-12 text-center text-sm text-neutral-500 dark:text-neutral-400">
+                            <td colspan="10" class="px-6 py-12 text-center text-sm text-neutral-500 dark:text-neutral-400">
                                 {{ __('Aucun lead trouvé') }}
                             </td>
                         </tr>
