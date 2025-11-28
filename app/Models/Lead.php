@@ -24,9 +24,11 @@ class Lead extends Model
      */
     protected $fillable = [
         'form_id',
+        'source',
         'data',
         'email',
         'status',
+        'status_id',
         'email_confirmed_at',
         'email_confirmation_token',
         'email_confirmation_token_expires_at',
@@ -107,6 +109,14 @@ class Lead extends Model
     }
 
     /**
+     * Get the status for this lead.
+     */
+    public function leadStatus(): BelongsTo
+    {
+        return $this->belongsTo(LeadStatus::class, 'status_id');
+    }
+
+    /**
      * Get the score priority level.
      */
     public function getScorePriority(): string
@@ -171,27 +181,63 @@ class Lead extends Model
     }
 
     /**
-     * Get the current status as LeadStatus enum.
+     * Get the current status as LeadStatus enum (for backward compatibility).
      */
     public function getStatusEnum(): LeadStatus
     {
+        // Try to get from relation first
+        if ($this->status_id && $this->relationLoaded('leadStatus') && $this->leadStatus) {
+            return LeadStatus::tryFrom($this->leadStatus->slug) ?? LeadStatus::PendingEmail;
+        }
+
+        // Fallback to old status column
         return LeadStatus::tryFrom($this->attributes['status'] ?? 'pending_email') ?? LeadStatus::PendingEmail;
     }
 
     /**
-     * Set the status from enum or string.
+     * Set the status from enum, string, or LeadStatus model.
      */
-    public function setStatus(LeadStatus|string $status): void
+    public function setStatus(LeadStatus|string|\App\Models\LeadStatus $status): void
     {
+        // If it's a LeadStatus model, use it directly
+        if ($status instanceof \App\Models\LeadStatus) {
+            $this->status_id = $status->id;
+            $this->attributes['status'] = $status->slug; // Keep for backward compatibility
+            return;
+        }
+
+        // If it's an enum, find the corresponding model
         if ($status instanceof LeadStatus) {
-            $this->attributes['status'] = $status->value;
-        } else {
+            $statusModel = \App\Models\LeadStatus::where('slug', $status->value)->first();
+            if ($statusModel) {
+                $this->status_id = $statusModel->id;
+                $this->attributes['status'] = $status->value;
+                return;
+            }
+        }
+
+        // If it's a string, try to find by slug
+        if (is_string($status)) {
+            $statusModel = \App\Models\LeadStatus::where('slug', $status)->first();
+            if ($statusModel) {
+                $this->status_id = $statusModel->id;
+                $this->attributes['status'] = $status;
+                return;
+            }
+
+            // Fallback: try enum
             $statusEnum = LeadStatus::tryFrom($status);
             if ($statusEnum) {
-                $this->attributes['status'] = $statusEnum->value;
-            } else {
-                $this->attributes['status'] = $status;
+                $statusModel = \App\Models\LeadStatus::where('slug', $statusEnum->value)->first();
+                if ($statusModel) {
+                    $this->status_id = $statusModel->id;
+                    $this->attributes['status'] = $statusEnum->value;
+                    return;
+                }
             }
+
+            // Last resort: just set the string
+            $this->attributes['status'] = $status;
         }
     }
 
@@ -200,6 +246,12 @@ class Lead extends Model
      */
     public function isActive(): bool
     {
+        // Try to get from relation first
+        if ($this->status_id && $this->relationLoaded('leadStatus') && $this->leadStatus) {
+            return $this->leadStatus->isActiveStatus();
+        }
+
+        // Fallback to enum for backward compatibility
         return $this->getStatusEnum()->isActive();
     }
 
@@ -208,6 +260,12 @@ class Lead extends Model
      */
     public function isFinal(): bool
     {
+        // Try to get from relation first
+        if ($this->status_id && $this->relationLoaded('leadStatus') && $this->leadStatus) {
+            return $this->leadStatus->isFinalStatus();
+        }
+
+        // Fallback to enum for backward compatibility
         return $this->getStatusEnum()->isFinal();
     }
 
@@ -217,7 +275,15 @@ class Lead extends Model
     public function confirmEmail(): void
     {
         $this->email_confirmed_at = now();
-        $this->setStatus(LeadStatus::EmailConfirmed);
+        
+        // Try to get status from model, fallback to enum
+        $status = \App\Models\LeadStatus::getBySlug('email_confirmed');
+        if ($status) {
+            $this->setStatus($status);
+        } else {
+            $this->setStatus(LeadStatus::EmailConfirmed);
+        }
+        
         // Use save() to trigger Observer
         $this->save();
 
@@ -237,29 +303,51 @@ class Lead extends Model
      */
     public function markAsPendingCall(): void
     {
-        $this->setStatus(LeadStatus::PendingCall);
+        // Try to get status from model, fallback to enum
+        $status = \App\Models\LeadStatus::getBySlug('pending_call');
+        if ($status) {
+            $this->setStatus($status);
+        } else {
+            $this->setStatus(LeadStatus::PendingCall);
+        }
         $this->save();
     }
 
     /**
      * Update status after call.
      */
-    public function updateAfterCall(LeadStatus|string $status, ?string $comment = null): void
+    public function updateAfterCall(LeadStatus|string|\App\Models\LeadStatus $status, ?string $comment = null): void
     {
         $oldStatus = $this->status;
 
-        // Convert string to enum if needed
+        // Convert string to model if needed
         if (is_string($status)) {
-            $statusEnum = LeadStatus::tryFrom($status);
-            if (! $statusEnum) {
-                throw new \InvalidArgumentException("Invalid status: {$status}");
+            $statusModel = \App\Models\LeadStatus::getBySlug($status);
+            if (! $statusModel) {
+                // Fallback to enum for backward compatibility
+                $statusEnum = LeadStatus::tryFrom($status);
+                if (! $statusEnum) {
+                    throw new \InvalidArgumentException("Invalid status: {$status}");
+                }
+                // Try to find model from enum
+                $statusModel = \App\Models\LeadStatus::getBySlug($statusEnum->value);
+                if (! $statusModel) {
+                    throw new \InvalidArgumentException("Status model not found for: {$status}");
+                }
             }
-            $status = $statusEnum;
+            $status = $statusModel;
+        } elseif ($status instanceof LeadStatus) {
+            // Convert enum to model
+            $statusModel = \App\Models\LeadStatus::getBySlug($status->value);
+            if (! $statusModel) {
+                throw new \InvalidArgumentException("Status model not found for enum: {$status->value}");
+            }
+            $status = $statusModel;
         }
 
         // Validate that the status can be set after a call
-        if (! $status->canBeSetAfterCall()) {
-            throw new \InvalidArgumentException("Status {$status->value} cannot be set after a call");
+        if (! $status->canBeSetAfterCallStatus()) {
+            throw new \InvalidArgumentException("Status {$status->slug} cannot be set after a call");
         }
 
         $this->setStatus($status);
@@ -270,17 +358,17 @@ class Lead extends Model
         $this->save();
 
         // Dispatch LeadStatusUpdated event for webhooks
-        event(new LeadStatusUpdated($this, $oldStatus, $status->value));
+        event(new LeadStatusUpdated($this, $oldStatus, $status->slug));
 
         // Dispatch LeadConverted event if status is converted
-        if ($status === LeadStatus::Converted) {
+        if ($status->slug === 'converted') {
             event(new LeadConverted($this));
         }
 
         // Log the status update
         try {
             $auditService = app(\App\Services\AuditService::class);
-            $auditService->logLeadStatusUpdated($this, $oldStatus, $status->value, $comment);
+            $auditService->logLeadStatusUpdated($this, $oldStatus, $status->slug, $comment);
         } catch (\Exception $e) {
             // Silently fail if audit service is not available (e.g., in tests)
         }

@@ -12,53 +12,98 @@
             </a>
 
             <flux:navlist variant="outline">
-                <flux:navlist.group :heading="__('Platform')" class="grid">
+                <!-- Dashboard -->
+                <flux:navlist.group :heading="__('Vue d\'ensemble')" class="grid">
                     <flux:navlist.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard*')" wire:navigate>{{ __('Dashboard') }}</flux:navlist.item>
                 </flux:navlist.group>
 
                 @if (auth()->user()?->role?->slug === 'super_admin')
-                    <flux:navlist.group :heading="__('Gestion')" class="grid">
+                    <!-- Leads & Distribution -->
+                    <flux:navlist.group :heading="__('Leads & Distribution')" class="grid">
+                        <flux:navlist.item icon="user-group" :href="route('admin.leads')" :current="request()->routeIs('admin.leads*')" wire:navigate>{{ __('Tous les Leads') }}</flux:navlist.item>
+                        <flux:navlist.item icon="table-cells" :href="route('admin.call-centers.leads')" :current="request()->routeIs('admin.call-centers.leads')" wire:navigate>{{ __('Leads par centre') }}</flux:navlist.item>
+                    </flux:navlist.group>
+
+                    <!-- Centres d'appels -->
+                    <flux:navlist.group :heading="__('Centres d\'appels')" class="grid">
+                        <flux:navlist.item icon="building-office-2" :href="route('admin.call-centers')" :current="request()->routeIs('admin.call-centers*')" wire:navigate>{{ __('Centres d\'appels') }}</flux:navlist.item>
+                    </flux:navlist.group>
+
+                    <!-- Configuration -->
+                    <flux:navlist.group :heading="__('Configuration')" class="grid">
                         <flux:navlist.item icon="document-text" :href="route('admin.forms')" :current="request()->routeIs('admin.forms*')" wire:navigate>{{ __('Formulaires') }}</flux:navlist.item>
                         <flux:navlist.item icon="envelope" :href="route('admin.smtp-profiles')" :current="request()->routeIs('admin.smtp-profiles*')" wire:navigate>{{ __('Profils SMTP') }}</flux:navlist.item>
                         <flux:navlist.item icon="document-duplicate" :href="route('admin.email-templates')" :current="request()->routeIs('admin.email-templates*')" wire:navigate>{{ __('Templates d\'email') }}</flux:navlist.item>
-                        <flux:navlist.item icon="building-office-2" :href="route('admin.call-centers')" :current="request()->routeIs('admin.call-centers*')" wire:navigate>{{ __('Centres d\'appels') }}</flux:navlist.item>
-                        <flux:navlist.item icon="table-cells" :href="route('admin.call-centers.leads')" :current="request()->routeIs('admin.call-centers.leads')" wire:navigate>{{ __('Leads par centre') }}</flux:navlist.item>
-                        <flux:navlist.item icon="user-group" :href="route('admin.leads')" :current="request()->routeIs('admin.leads*')" wire:navigate>{{ __('Leads') }}</flux:navlist.item>
+                        <flux:navlist.item icon="tag" :href="route('admin.tags')" :current="request()->routeIs('admin.tags*')" wire:navigate>{{ __('Tags') }}</flux:navlist.item>
+                        <flux:navlist.item icon="check-circle" :href="route('admin.statuses')" :current="request()->routeIs('admin.statuses*')" wire:navigate>{{ __('Statuts') }}</flux:navlist.item>
+                        <flux:navlist.item icon="chart-bar" :href="route('admin.scoring')" :current="request()->routeIs('admin.scoring*')" wire:navigate>{{ __('Scoring') }}</flux:navlist.item>
+                    </flux:navlist.group>
+
+                    <!-- Analytics & Reporting -->
+                    <flux:navlist.group :heading="__('Analytics & Reporting')" class="grid">
                         <flux:navlist.item icon="chart-bar" :href="route('admin.statistics')" :current="request()->routeIs('admin.statistics*')" wire:navigate>{{ __('Statistiques') }}</flux:navlist.item>
                         <flux:navlist.item icon="document-text" :href="route('admin.audit-logs')" :current="request()->routeIs('admin.audit-logs*')" wire:navigate>{{ __('Journal d\'Audit') }}</flux:navlist.item>
-                        <flux:navlist.item icon="key" :href="route('admin.api-tokens')" :current="request()->routeIs('admin.api*')" wire:navigate>{{ __('Tokens API') }}</flux:navlist.item>
+                    </flux:navlist.group>
+
+                    <!-- Intégrations -->
+                    <flux:navlist.group :heading="__('Intégrations')" class="grid">
+                        <flux:navlist.item icon="key" :href="route('admin.api-tokens')" :current="request()->routeIs('admin.api*')" wire:navigate>{{ __('API & Tokens') }}</flux:navlist.item>
                         <flux:navlist.item icon="globe-alt" :href="route('admin.webhooks')" :current="request()->routeIs('admin.webhooks*')" wire:navigate>{{ __('Webhooks') }}</flux:navlist.item>
-                        <flux:navlist.item icon="tag" :href="route('admin.tags')" :current="request()->routeIs('admin.tags*')" wire:navigate>{{ __('Tags') }}</flux:navlist.item>
-                        <flux:navlist.item icon="chart-bar" :href="route('admin.scoring')" :current="request()->routeIs('admin.scoring*')" wire:navigate>{{ __('Configuration Scoring') }}</flux:navlist.item>
+                        <flux:navlist.item icon="arrow-down-tray" :href="route('admin.mailwizz.index')" :current="request()->routeIs('admin.mailwizz*')" wire:navigate>{{ __('MailWizz') }}</flux:navlist.item>
                     </flux:navlist.group>
                 @endif
 
                 @if (auth()->user()?->role?->slug === 'call_center_owner')
-                    <flux:navlist.group :heading="__('Gestion')" class="grid">
-                        <flux:navlist.item icon="users" :href="route('owner.agents')" :current="request()->routeIs('owner.agents*')" wire:navigate>{{ __('Agents') }}</flux:navlist.item>
+                    <!-- Leads & Distribution -->
+                    <flux:navlist.group :heading="__('Leads & Distribution')" class="grid">
                         <flux:navlist.item icon="user-group" :href="route('owner.leads')" :current="request()->routeIs('owner.leads*')" wire:navigate>{{ __('Leads') }}</flux:navlist.item>
                         <flux:navlist.item icon="arrows-right-left" :href="route('owner.distribution')" :current="request()->routeIs('owner.distribution*')" wire:navigate>{{ __('Distribution') }}</flux:navlist.item>
-                        <flux:navlist.item icon="chart-bar" :href="route('owner.statistics')" :current="request()->routeIs('owner.statistics*')" wire:navigate>{{ __('Statistiques') }}</flux:navlist.item>
+                    </flux:navlist.group>
+
+                    <!-- Équipe -->
+                    <flux:navlist.group :heading="__('Équipe')" class="grid">
+                        <flux:navlist.item icon="users" :href="route('owner.agents')" :current="request()->routeIs('owner.agents*')" wire:navigate>{{ __('Agents') }}</flux:navlist.item>
+                    </flux:navlist.group>
+
+                    <!-- Configuration -->
+                    <flux:navlist.group :heading="__('Configuration')" class="grid">
                         <flux:navlist.item icon="tag" :href="route('owner.tags')" :current="request()->routeIs('owner.tags*')" wire:navigate>{{ __('Tags') }}</flux:navlist.item>
+                        <flux:navlist.item icon="check-circle" :href="route('owner.statuses')" :current="request()->routeIs('owner.statuses*')" wire:navigate>{{ __('Statuts') }}</flux:navlist.item>
+                    </flux:navlist.group>
+
+                    <!-- Analytics -->
+                    <flux:navlist.group :heading="__('Analytics')" class="grid">
+                        <flux:navlist.item icon="chart-bar" :href="route('owner.statistics')" :current="request()->routeIs('owner.statistics*')" wire:navigate>{{ __('Statistiques') }}</flux:navlist.item>
                     </flux:navlist.group>
                 @endif
 
                 @if (auth()->user()?->role?->slug === 'supervisor')
-                    <flux:navlist.group :heading="__('Supervision')" class="grid">
+                    <!-- Équipe -->
+                    <flux:navlist.group :heading="__('Équipe')" class="grid">
                         <flux:navlist.item icon="users" :href="route('supervisor.agents')" :current="request()->routeIs('supervisor.agents*')" wire:navigate>{{ __('Mes Agents') }}</flux:navlist.item>
+                    </flux:navlist.group>
+
+                    <!-- Leads -->
+                    <flux:navlist.group :heading="__('Leads')" class="grid">
                         <flux:navlist.item icon="user-group" :href="route('supervisor.leads')" :current="request()->routeIs('supervisor.leads*')" wire:navigate>{{ __('Leads de l\'équipe') }}</flux:navlist.item>
+                    </flux:navlist.group>
+
+                    <!-- Analytics -->
+                    <flux:navlist.group :heading="__('Analytics')" class="grid">
                         <flux:navlist.item icon="chart-bar" :href="route('supervisor.statistics')" :current="request()->routeIs('supervisor.statistics*')" wire:navigate>{{ __('Statistiques') }}</flux:navlist.item>
                     </flux:navlist.group>
                 @endif
 
                 @if (auth()->user()?->role?->slug === 'agent')
+                    <!-- Mes Leads -->
                     <flux:navlist.group :heading="__('Mes Leads')" class="grid">
                         <flux:navlist.item icon="user-group" :href="route('agent.leads')" :current="request()->routeIs('agent.leads*')" wire:navigate>{{ __('Mes Leads') }}</flux:navlist.item>
                         <flux:navlist.item icon="calendar" :href="route('agent.reminders.calendar')" :current="request()->routeIs('agent.reminders*')" wire:navigate>{{ __('Calendrier des Rappels') }}</flux:navlist.item>
                     </flux:navlist.group>
                 @endif
 
-                <flux:navlist.group :heading="__('Notifications')" class="grid">
+                <!-- Paramètres -->
+                <flux:navlist.group :heading="__('Paramètres')" class="grid">
                     <flux:navlist.item icon="bell" :href="route('settings.alerts')" :current="request()->routeIs('settings.alerts*')" wire:navigate>{{ __('Alertes') }}</flux:navlist.item>
                 </flux:navlist.group>
             </flux:navlist>

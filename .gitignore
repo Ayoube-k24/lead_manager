@@ -21,3 +21,9 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# Ignore all .md files except README.md and DOCKER.md
+*.md
+!README.md
+!DOCKER.md
+!docker.md

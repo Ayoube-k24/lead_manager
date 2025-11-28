@@ -42,10 +42,19 @@ class LeadSearchService
     {
         $query = Lead::query();
 
-        // Filter by status
+        // Filter by status (support both slug and status_id)
         if (! empty($filters['status'])) {
             $statuses = is_array($filters['status']) ? $filters['status'] : [$filters['status']];
-            $query->whereIn('status', $statuses);
+            
+            // Try to find status IDs from slugs
+            $statusIds = \App\Models\LeadStatus::whereIn('slug', $statuses)->pluck('id')->toArray();
+            
+            if (! empty($statusIds)) {
+                $query->whereIn('status_id', $statusIds);
+            } else {
+                // Fallback to old status column for backward compatibility
+                $query->whereIn('status', $statuses);
+            }
         }
 
         // Filter by date range (created_at)

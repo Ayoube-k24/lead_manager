@@ -213,7 +213,7 @@ class LeadScoringService
             \App\LeadStatus::Confirmed => 85,
             \App\LeadStatus::CallbackPending => 60,
             \App\LeadStatus::Rejected => 10,
-            \App\LeadStatus::Unqualified => 5,
+            \App\LeadStatus::NotInterested => 5,
             default => 50,
         };
     }

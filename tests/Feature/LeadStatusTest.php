@@ -10,29 +10,44 @@ use App\Models\User;
 beforeEach(function () {
     require_once __DIR__.'/Sprint1/EnsureMigrationsRun.php';
     ensureMigrationsRun();
+
+    // Ensure statuses are seeded
+    if (\App\Models\LeadStatus::count() === 0) {
+        \Artisan::call('db:seed', ['--class' => 'LeadStatusSeeder']);
+    }
 });
 
 test('quote sent status can be set after call', function () {
+    $pendingCallStatus = \App\Models\LeadStatus::where('slug', 'pending_call')->first();
+    $quoteSentStatus = \App\Models\LeadStatus::where('slug', 'quote_sent')->first();
+
     $lead = Lead::factory()->create([
+        'status_id' => $pendingCallStatus->id,
         'status' => 'pending_call',
     ]);
 
-    $lead->updateAfterCall(LeadStatus::QuoteSent, 'Devis envoyé au prospect');
+    $lead->updateAfterCall('quote_sent', 'Devis envoyé au prospect');
 
     $lead->refresh();
 
     expect($lead->status)->toBe('quote_sent')
+        ->and($lead->status_id)->toBe($quoteSentStatus->id)
         ->and($lead->call_comment)->toBe('Devis envoyé au prospect')
         ->and($lead->called_at)->not->toBeNull();
 });
 
 test('quote sent status is active', function () {
+    $quoteSentStatus = \App\Models\LeadStatus::firstOrCreate(
+        ['slug' => 'quote_sent'],
+        ['name' => 'Devis envoyé', 'color' => '#22D3EE', 'is_system' => true, 'is_active' => true]
+    );
+
     $lead = Lead::factory()->create([
+        'status_id' => $quoteSentStatus->id,
         'status' => 'quote_sent',
     ]);
 
-    expect($lead->isActive())->toBeTrue()
-        ->and($lead->getStatusEnum())->toBe(LeadStatus::QuoteSent);
+    expect($lead->isActive())->toBeTrue();
 });
 
 test('quote sent status has correct label', function () {
@@ -60,6 +75,15 @@ test('quote sent status is in active statuses', function () {
 });
 
 test('agent can update lead status to quote sent', function () {
+    $pendingCallStatus = \App\Models\LeadStatus::firstOrCreate(
+        ['slug' => 'pending_call'],
+        ['name' => 'En file d\'appel', 'color' => '#FB923C', 'is_system' => true]
+    );
+    $quoteSentStatus = \App\Models\LeadStatus::firstOrCreate(
+        ['slug' => 'quote_sent'],
+        ['name' => 'Devis envoyé', 'color' => '#22D3EE', 'is_system' => true, 'can_be_set_after_call' => true]
+    );
+
     $agentRole = Role::firstOrCreate(
         ['slug' => 'agent'],
         ['name' => 'Agent', 'slug' => 'agent']
@@ -67,6 +91,7 @@ test('agent can update lead status to quote sent', function () {
 
     $agent = User::factory()->create(['role_id' => $agentRole->id]);
     $lead = Lead::factory()->create([
+        'status_id' => $pendingCallStatus->id,
         'status' => 'pending_call',
         'assigned_to' => $agent->id,
     ]);
@@ -76,5 +101,5 @@ test('agent can update lead status to quote sent', function () {
     $lead->refresh();
 
     expect($lead->status)->toBe('quote_sent')
-        ->and($lead->getStatusEnum())->toBe(LeadStatus::QuoteSent);
+        ->and($lead->status_id)->toBe($quoteSentStatus->id);
 });

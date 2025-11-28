@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             //SmtpProfileSeeder::class,
             EmailTemplateSeeder::class,
+            LeadStatusSeeder::class,
             //FormSeeder::class,
         ]);
 

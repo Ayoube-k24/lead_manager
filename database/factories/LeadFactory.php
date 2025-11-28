@@ -31,6 +31,7 @@ class LeadFactory extends Factory
                 'phone' => fake()->phoneNumber(),
             ],
             'email' => fake()->safeEmail(),
+            'source' => 'form',
             'status' => fake()->randomElement(['pending_email', 'email_confirmed', 'pending_call', 'confirmed', 'rejected', 'callback_pending']),
             'email_confirmed_at' => fake()->optional()->dateTime(),
             'email_confirmation_token' => fake()->optional()->sha1(),

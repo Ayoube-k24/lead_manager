@@ -42,6 +42,31 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('alerts:check')
             ->everyFifteenMinutes()
             ->withoutOverlapping();
+
+        // Import MailWizz leads - dynamic frequency from config
+        $schedule->call(function () {
+            $configs = \App\Models\MailWizzConfig::where('is_active', true)->get();
+
+            foreach ($configs as $config) {
+                // Vérifier si c'est le moment d'importer selon la fréquence
+                $shouldImport = false;
+
+                if (! $config->last_import_at) {
+                    $shouldImport = true;
+                } else {
+                    $minutesSinceLastImport = now()->diffInMinutes($config->last_import_at);
+                    if ($minutesSinceLastImport >= $config->import_frequency) {
+                        $shouldImport = true;
+                    }
+                }
+
+                if ($shouldImport) {
+                    \Artisan::call('mailwizz:import-leads', [
+                        '--config-id' => $config->id,
+                    ]);
+                }
+            }
+        })->name('mailwizz-import-check')->everyMinute()->withoutOverlapping();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

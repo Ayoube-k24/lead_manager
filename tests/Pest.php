@@ -17,10 +17,9 @@ pest()->extend(Tests\TestCase::class)
 
 // Ensure migrations run correctly in all Feature tests
 beforeEach(function () {
-    if (str_contains($this->getName(), 'Feature')) {
-        require_once __DIR__.'/Feature/Sprint1/EnsureMigrationsRun.php';
-        ensureMigrationsRun();
-    }
+    // Only run for Feature tests (already filtered by ->in('Feature'))
+    require_once __DIR__.'/Feature/Sprint1/EnsureMigrationsRun.php';
+    ensureMigrationsRun();
 })->in('Feature');
 
 /*

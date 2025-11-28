@@ -49,14 +49,15 @@ new class extends Component
     {
         $this->showModal = true;
         // Initialiser avec le statut actuel s'il est valide, sinon utiliser le premier statut post-appel par défaut
-        $statusEnum = $this->lead->getStatusEnum();
-        $postCallStatuses = \App\LeadStatus::postCallStatuses();
+        $currentStatus = $this->lead->leadStatus;
+        $postCallStatuses = \App\Models\LeadStatus::getPostCallStatuses();
         
-        if (in_array($statusEnum, $postCallStatuses)) {
-            $this->status = $statusEnum->value;
+        if ($currentStatus && $postCallStatuses->contains('id', $currentStatus->id)) {
+            $this->status = $currentStatus->slug;
         } else {
             // Utiliser 'qualified' par défaut pour les nouveaux appels
-            $this->status = \App\LeadStatus::Qualified->value;
+            $qualifiedStatus = \App\Models\LeadStatus::getBySlug('qualified');
+            $this->status = $qualifiedStatus ? $qualifiedStatus->slug : 'qualified';
         }
         
         $this->comment = $this->lead->call_comment ?? '';
@@ -71,11 +72,10 @@ new class extends Component
 
     public function updateStatus(): void
     {
-        // Get valid status values from enum
-        $validStatuses = array_map(
-            fn($status) => $status->value,
-            \App\LeadStatus::postCallStatuses()
-        );
+        // Get valid status slugs from model
+        $validStatuses = \App\Models\LeadStatus::getPostCallStatuses()
+            ->pluck('slug')
+            ->toArray();
         
         $this->validate([
             'status' => ['required', 'in:'.implode(',', $validStatuses)],
@@ -95,15 +95,15 @@ new class extends Component
         // Get statuses based on experience level
         if ($user->isBeginner()) {
             // Simplified list for beginners
-            $statuses = \App\LeadStatus::beginnerStatuses();
+            $statuses = \App\Models\LeadStatus::getBeginnerStatuses();
         } else {
             // Full list for intermediate and advanced
-            $statuses = \App\LeadStatus::postCallStatuses();
+            $statuses = \App\Models\LeadStatus::getPostCallStatuses();
         }
         
         $options = [];
         foreach ($statuses as $status) {
-            $options[$status->value] = $status->label();
+            $options[$status->slug] = $status->getLabel();
         }
         
         return $options;
@@ -306,8 +306,9 @@ new class extends Component
             </h1>
         </div>
         @php
-            $statusEnum = $this->lead->getStatusEnum();
-            $canUpdate = $statusEnum->isActive() || in_array($statusEnum, \App\LeadStatus::postCallStatuses());
+            $currentStatus = $this->lead->leadStatus;
+            $postCallStatuses = \App\Models\LeadStatus::getPostCallStatuses();
+            $canUpdate = ($currentStatus && $currentStatus->isActiveStatus()) || ($currentStatus && $postCallStatuses->contains('id', $currentStatus->id));
         @endphp
         @if ($canUpdate)
             <flux:button wire:click="openUpdateModal" variant="primary">
@@ -483,8 +484,8 @@ new class extends Component
             <div class="space-y-3">
                 @foreach ($statusHistory as $log)
                     @php
-                        $oldStatus = \App\LeadStatus::tryFrom($log->properties['old_status'] ?? '');
-                        $newStatus = \App\LeadStatus::tryFrom($log->properties['new_status'] ?? '');
+                        $oldStatus = \App\Models\LeadStatus::getBySlug($log->properties['old_status'] ?? '');
+                        $newStatus = \App\Models\LeadStatus::getBySlug($log->properties['new_status'] ?? '');
                     @endphp
                     <div class="flex items-start gap-3 border-b border-neutral-200 pb-3 last:border-0 dark:border-neutral-700">
                         <div class="flex-1">
@@ -943,9 +944,9 @@ new class extends Component
                 <div class="flex flex-wrap gap-2">
                     @foreach ($this->statusOptions as $value => $label)
                         @php
-                            $statusEnum = \App\LeadStatus::tryFrom($value);
+                            $statusModel = \App\Models\LeadStatus::getBySlug($value);
                             $isSelected = $status === $value;
-                            $description = $statusEnum ? $statusEnum->description() : '';
+                            $description = $statusModel ? $statusModel->description : '';
                         @endphp
                         <div class="relative group">
                             <button
@@ -975,12 +976,12 @@ new class extends Component
                 </div>
                 @if ($isBeginner && $status)
                     @php
-                        $selectedStatusEnum = \App\LeadStatus::tryFrom($status);
+                        $selectedStatusModel = \App\Models\LeadStatus::getBySlug($status);
                     @endphp
-                    @if ($selectedStatusEnum)
+                    @if ($selectedStatusModel)
                         <div class="mt-3 rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-900">
                             <p class="text-xs font-medium text-neutral-700 dark:text-neutral-300">{{ __('Description :') }}</p>
-                            <p class="mt-1 text-xs text-neutral-600 dark:text-neutral-400">{{ $selectedStatusEnum->description() }}</p>
+                            <p class="mt-1 text-xs text-neutral-600 dark:text-neutral-400">{{ $selectedStatusModel->description }}</p>
                         </div>
                     @endif
                 @endif

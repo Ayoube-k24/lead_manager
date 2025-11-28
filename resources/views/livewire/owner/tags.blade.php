@@ -4,6 +4,7 @@ use App\Models\Category;
 use App\Models\Tag;
 use App\Services\TagService;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 
@@ -23,6 +24,69 @@ new class extends Component {
     public function updatedFilterCategoryId(): void
     {
         $this->resetPage();
+    }
+
+    public function updatingPage(): void
+    {
+        $this->reset('selected');
+    }
+
+    public function selectAll(): void
+    {
+        $user = Auth::user();
+        $callCenter = $user->callCenter;
+        
+        // Normaliser les IDs sélectionnés en entiers
+        $currentSelected = array_map('intval', $this->selected);
+        
+        // Obtenir les IDs de la page actuelle depuis la pagination
+        $query = Tag::query()
+            ->with(['category'])
+            ->withCount(['leads' => function ($query) use ($callCenter) {
+                if ($callCenter) {
+                    $query->where('call_center_id', $callCenter->id);
+                }
+            }])
+            ->when($this->search, fn ($q) => $q->where('name', 'like', "%{$this->search}%")
+                ->orWhere('description', 'like', "%{$this->search}%"))
+            ->when($this->filterCategoryId, fn ($q) => $q->where('category_id', $this->filterCategoryId))
+            ->when($callCenter, function ($query) use ($callCenter) {
+                $query->whereHas('leads', function ($q) use ($callCenter) {
+                    $q->where('call_center_id', $callCenter->id);
+                });
+            })
+            ->orderBy('name');
+        
+        $paginator = $query->paginate(15);
+        
+        // Filter to only non-system tags from current page
+        $allIds = [];
+        foreach ($paginator->items() as $tag) {
+            if (! $tag->is_system) {
+                $allIds[] = (int) $tag->id;
+            }
+        }
+        
+        // Vérifier si tous les éléments de la page actuelle sont déjà sélectionnés
+        $allSelected = count($allIds) > 0 && count(array_intersect($currentSelected, $allIds)) === count($allIds);
+        
+        if ($allSelected) {
+            // Désélectionner uniquement les éléments de la page actuelle
+            $this->selected = array_values(array_diff($currentSelected, $allIds));
+        } else {
+            // Sélectionner tous les éléments de la page actuelle (en gardant les autres sélections)
+            $this->selected = array_values(array_unique(array_merge($currentSelected, $allIds)));
+        }
+    }
+
+    public function deselectAll(): void
+    {
+        $this->reset('selected');
+    }
+
+    public function getSelectedCountProperty(): int
+    {
+        return count($this->selected);
     }
 
     public function delete(Tag $tag): void
@@ -50,7 +114,7 @@ new class extends Component {
         foreach ($this->selected as $tagId) {
             try {
                 $tag = Tag::find($tagId);
-                if ($tag) {
+                if ($tag && ! $tag->is_system) {
                     $service->deleteTag($tag);
                     $count++;
                 }
@@ -94,9 +158,14 @@ new class extends Component {
             ->orderBy('name')
             ->paginate(15);
 
+        // Normaliser les IDs sélectionnés en entiers pour la comparaison
+        $selectedIds = array_map('intval', $this->selected);
+
         return [
             'tags' => $tags,
             'categories' => Category::orderBy('name')->get(),
+            'selectedCount' => count($this->selected),
+            'selected' => $selectedIds,
         ];
     }
 }; ?>
@@ -150,20 +219,56 @@ new class extends Component {
         </div>
     </div>
 
-    <!-- Actions en masse -->
-    @if (count($selected) > 0)
-        <div class="rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
-            <div class="flex items-center justify-between">
-                <span class="text-sm font-medium text-blue-900 dark:text-blue-100">
-                    {{ __(':count tag(s) sélectionné(s)', ['count' => count($selected)]) }}
-                </span>
+    <!-- Barre d'actions en masse -->
+    @if ($selectedCount > 0)
+        <div 
+            wire:transition
+            class="flex flex-col gap-4 rounded-lg border-2 border-red-300 bg-red-50 p-4 shadow-sm transition-all dark:border-red-700 dark:bg-red-900/20 sm:flex-row sm:items-center sm:justify-between"
+        >
+            <div class="flex items-center gap-3">
+                <div class="flex h-8 w-8 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/40">
+                    <svg class="h-5 w-5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-sm font-semibold text-red-900 dark:text-red-100">
+                        {{ $selectedCount }} {{ __('élément(s) sélectionné(s)') }}
+                    </p>
+                    <p class="text-xs text-red-700 dark:text-red-300">
+                        {{ __('La suppression est irréversible.') }}
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
                 <flux:button 
-                    wire:click="deleteSelected" 
-                    wire:confirm="{{ __('Êtes-vous sûr de vouloir supprimer les tags sélectionnés ?') }}"
+                    wire:click="deleteSelected"
+                    wire:confirm="{{ __('Êtes-vous sûr de vouloir supprimer :count élément(s) ? Cette action est irréversible.', ['count' => $selectedCount]) }}"
                     variant="danger" 
                     size="sm"
+                    icon="trash"
+                    wire:loading.attr="disabled"
+                    wire:target="deleteSelected"
                 >
-                    {{ __('Supprimer la sélection') }}
+                    <span wire:loading.remove wire:target="deleteSelected">
+                        {{ __('Supprimer') }}
+                    </span>
+                    <span wire:loading wire:target="deleteSelected" class="flex items-center gap-2">
+                        <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        {{ __('Suppression...') }}
+                    </span>
+                </flux:button>
+                <flux:button 
+                    wire:click="deselectAll"
+                    variant="ghost" 
+                    size="sm"
+                    wire:loading.attr="disabled"
+                    wire:target="deleteSelected"
+                >
+                    {{ __('Annuler') }}
                 </flux:button>
             </div>
         </div>
@@ -172,13 +277,127 @@ new class extends Component {
     <!-- Liste des tags -->
     <div class="rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
         @if ($tags->count() > 0)
-            <div class="divide-y divide-neutral-200 dark:divide-neutral-700">
-                @foreach ($tags as $tag)
-                    <div class="flex items-center gap-4 p-4 hover:bg-neutral-50 dark:hover:bg-neutral-700/50">
-                        <flux:checkbox 
-                            wire:model="selected" 
-                            value="{{ $tag->id }}"
-                        />
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b border-neutral-200 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900/50">
+                            <th class="px-6 py-3 text-left text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+                                @php
+                                    $selectableIds = [];
+                                    foreach ($tags as $tag) {
+                                        if (!$tag->is_system) {
+                                            $selectableIds[] = (int) $tag->id;
+                                        }
+                                    }
+                                    $allSelected = count($selectableIds) > 0 && count(array_intersect($selected, $selectableIds)) === count($selectableIds) && count($selectableIds) > 0;
+                                @endphp
+                                <flux:checkbox 
+                                    wire:click="selectAll"
+                                    :checked="$allSelected"
+                                />
+                            </th>
+                            <th class="px-6 py-3 text-left text-sm font-semibold text-neutral-700 dark:text-neutral-300">{{ __('Tag') }}</th>
+                            <th class="px-6 py-3 text-left text-sm font-semibold text-neutral-700 dark:text-neutral-300">{{ __('Catégorie') }}</th>
+                            <th class="px-6 py-3 text-left text-sm font-semibold text-neutral-700 dark:text-neutral-300">{{ __('Description') }}</th>
+                            <th class="px-6 py-3 text-left text-sm font-semibold text-neutral-700 dark:text-neutral-300">{{ __('Utilisation') }}</th>
+                            <th class="px-6 py-3 text-right text-sm font-semibold text-neutral-700 dark:text-neutral-300">{{ __('Actions') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-neutral-200 dark:divide-neutral-700">
+                        @foreach ($tags as $tag)
+                            <tr class="transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-900/30">
+                                <td class="px-6 py-4">
+                                    <flux:checkbox 
+                                        wire:model.live="selected"
+                                        :value="(int) $tag->id"
+                                        :checked="in_array((int) $tag->id, $selected)"
+                                        :disabled="$tag->is_system"
+                                    />
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="flex h-8 w-8 items-center justify-center rounded-full" style="background-color: {{ $tag->color }}20;">
+                                            <div class="h-3 w-3 rounded-full" style="background-color: {{ $tag->color }};"></div>
+                                        </div>
+                                        <div>
+                                            <div class="flex items-center gap-2">
+                                                <span class="font-medium text-neutral-900 dark:text-neutral-100">
+                                                    {{ $tag->name }}
+                                                </span>
+                                                @if ($tag->is_system)
+                                                    <flux:badge variant="primary" size="sm">{{ __('Système') }}</flux:badge>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    @if ($tag->category)
+                                        <flux:badge variant="ghost" size="sm">{{ $tag->category->name }}</flux:badge>
+                                    @else
+                                        <span class="text-sm text-neutral-400">-</span>
+                                    @endif
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm text-neutral-600 dark:text-neutral-400">
+                                        {{ $tag->description ? Str::limit($tag->description, 50) : '-' }}
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm text-neutral-600 dark:text-neutral-400">
+                                        {{ __(':count lead(s)', ['count' => $tag->leads_count]) }}
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <flux:dropdown position="bottom" align="end">
+                                        <flux:button variant="ghost" size="sm" icon="ellipsis-vertical">
+                                            {{ __('Actions') }}
+                                        </flux:button>
+
+                                        <flux:menu>
+                                            <flux:menu.radio.group>
+                                                <flux:menu.item 
+                                                    href="{{ route('owner.tags.edit', $tag) }}" 
+                                                    icon="pencil"
+                                                    wire:navigate
+                                                >
+                                                    {{ __('Modifier') }}
+                                                </flux:menu.item>
+                                            </flux:menu.radio.group>
+                                            @if (! $tag->is_system)
+                                                <flux:menu.separator />
+                                                <flux:menu.radio.group>
+                                                    <flux:menu.item 
+                                                        wire:click="delete({{ $tag->id }})"
+                                                        wire:confirm="{{ __('Êtes-vous sûr de vouloir supprimer ce tag ?') }}"
+                                                        icon="trash"
+                                                        class="!text-red-600 dark:!text-red-400"
+                                                    >
+                                                        {{ __('Supprimer') }}
+                                                    </flux:menu.item>
+                                                </flux:menu.radio.group>
+                                            @endif
+                                        </flux:menu>
+                                    </flux:dropdown>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="border-t border-neutral-200 p-4 dark:border-neutral-700">
+                {{ $tags->links() }}
+            </div>
+        @else
+            <div class="p-12 text-center">
+                <p class="text-neutral-500 dark:text-neutral-400">{{ __('Aucun tag trouvé') }}</p>
+                <flux:button href="{{ route('owner.tags.create') }}" variant="primary" class="mt-4" wire:navigate>
+                    {{ __('Créer le premier tag') }}
+                </flux:button>
+            </div>
+        @endif
+    </div>
 
                         <div class="flex h-10 w-10 items-center justify-center rounded-full" style="background-color: {{ $tag->color }}20;">
                             <div class="h-4 w-4 rounded-full" style="background-color: {{ $tag->color }};"></div>

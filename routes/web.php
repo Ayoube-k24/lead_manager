@@ -125,6 +125,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('owner.tags.create');
         Volt::route('owner/tags/{tag}/edit', 'owner.tags.edit')
             ->name('owner.tags.edit');
+
+        // Gestion des Statuts (Call Center Owners)
+        Volt::route('owner/statuses', 'owner.statuses')
+            ->name('owner.statuses');
+        Volt::route('owner/statuses/create', 'owner.statuses.create')
+            ->name('owner.statuses.create');
+        Volt::route('owner/statuses/{status}/edit', 'owner.statuses.edit')
+            ->name('owner.statuses.edit');
     });
 
     // Sprint 2: Gestion des formulaires et profils SMTP (Super Admin uniquement)
@@ -197,9 +205,25 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Volt::route('admin/tags/{tag}/edit', 'admin.tags.edit')
             ->name('admin.tags.edit');
 
+        // Gestion des Statuts (Super Admin)
+        Volt::route('admin/statuses', 'admin.statuses')
+            ->name('admin.statuses');
+        Volt::route('admin/statuses/create', 'admin.statuses.create')
+            ->name('admin.statuses.create');
+        Volt::route('admin/statuses/{status}/edit', 'admin.statuses.edit')
+            ->name('admin.statuses.edit');
+
         // Sprint 8: Configuration du Scoring (Super Admin)
         Volt::route('admin/scoring', 'admin.scoring')
             ->name('admin.scoring');
+
+        // MailWizz Integration
+        Volt::route('admin/mailwizz', 'admin.mailwizz.index')
+            ->name('admin.mailwizz.index');
+        Volt::route('admin/mailwizz/create', 'admin.mailwizz.create')
+            ->name('admin.mailwizz.create');
+        Volt::route('admin/mailwizz/{config}/edit', 'admin.mailwizz.edit')
+            ->name('admin.mailwizz.edit');
 
         // API Tokens and Documentation
         Volt::route('admin/api-tokens', 'admin.api-tokens')

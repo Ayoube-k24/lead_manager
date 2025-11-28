@@ -251,23 +251,22 @@ new class extends Component
                 {{ __('Statuts') }}
             </label>
             <div class="flex flex-wrap gap-2">
-                @foreach (\App\LeadStatus::cases() as $status)
+                @foreach (\App\Models\LeadStatus::allStatuses() as $status)
                     @php
-                        $isActive = in_array($status->value, $statusFilter);
-                        $statusEnum = $status;
+                        $isActive = in_array($status->slug, $statusFilter);
                     @endphp
                     <button
                         wire:click="
                             @if($isActive)
-                                $set('statusFilter', array_values(array_diff($statusFilter, ['{{ $status->value }}'])))
+                                $set('statusFilter', array_values(array_diff($statusFilter, ['{{ $status->slug }}'])))
                             @else
-                                $set('statusFilter', array_merge($statusFilter, ['{{ $status->value }}']))
+                                $set('statusFilter', array_merge($statusFilter, ['{{ $status->slug }}']))
                             @endif
                         "
                         type="button"
-                        class="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition-all {{ $isActive ? 'shadow-md ring-2 ring-offset-2 ' . str_replace('bg-', 'ring-', explode(' ', $statusEnum->colorClass())[0]) . ' ' . $statusEnum->colorClass() : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700' }}"
+                        class="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition-all {{ $isActive ? 'shadow-md ring-2 ring-offset-2 ' . str_replace('bg-', 'ring-', explode(' ', $status->getColorClass())[0]) . ' ' . $status->getColorClass() : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700' }}"
                     >
-                        {{ $status->label() }}
+                        {{ $status->getLabel() }}
                     </button>
                 @endforeach
             </div>

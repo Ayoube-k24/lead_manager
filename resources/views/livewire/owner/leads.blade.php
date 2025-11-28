@@ -215,17 +215,16 @@ new class extends Component
                 >
                     {{ __('Tous') }}
                 </button>
-                @foreach (\App\LeadStatus::cases() as $status)
+                @foreach (\App\Models\LeadStatus::allStatuses() as $status)
                     @php
-                        $isActive = $statusFilter === $status->value;
-                        $statusEnum = $status;
+                        $isActive = $statusFilter === $status->slug;
                     @endphp
                     <button
-                        wire:click="$set('statusFilter', '{{ $status->value }}')"
+                        wire:click="$set('statusFilter', '{{ $status->slug }}')"
                         type="button"
-                        class="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition-all {{ $isActive ? 'shadow-md ring-2 ring-offset-2 ' . str_replace('bg-', 'ring-', explode(' ', $statusEnum->colorClass())[0]) . ' ' . $statusEnum->colorClass() : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700' }}"
+                        class="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition-all {{ $isActive ? 'shadow-md ring-2 ring-offset-2 ' . str_replace('bg-', 'ring-', explode(' ', $status->getColorClass())[0]) . ' ' . $status->getColorClass() : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700' }}"
                     >
-                        {{ $status->label() }}
+                        {{ $status->getLabel() }}
                     </button>
                 @endforeach
             </div>
