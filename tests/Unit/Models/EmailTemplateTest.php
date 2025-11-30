@@ -142,3 +142,4 @@ describe('EmailTemplate Model - Subject Line', function () {
         expect($template->subject)->toBe($subject);
     });
 });
+

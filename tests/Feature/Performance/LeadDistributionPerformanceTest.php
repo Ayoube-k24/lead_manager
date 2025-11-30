@@ -156,3 +156,4 @@ describe('Performance - Lead Distribution', function () {
         expect($queriesWithEagerLoading)->toBeLessThan($queriesWithoutEagerLoading);
     });
 });
+

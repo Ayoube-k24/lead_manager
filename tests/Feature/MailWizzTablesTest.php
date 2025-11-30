@@ -45,3 +45,4 @@ test('can create mailwizz imported lead in test database', function () {
         ->and($imported->id)->not->toBeNull();
 });
 
+

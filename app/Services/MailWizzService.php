@@ -241,3 +241,4 @@ class MailWizzService
         return $stats;
     }
 }
+

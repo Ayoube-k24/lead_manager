@@ -113,3 +113,4 @@ describe('CSRF Protection - Form Validation', function () {
         $response->assertSuccessful(); // Route exists and is accessible
     });
 });
+

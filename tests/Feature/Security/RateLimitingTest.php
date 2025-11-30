@@ -204,3 +204,4 @@ describe('Rate Limiting - Password Reset', function () {
         $response->assertStatus(200); // Or 302 redirect
     });
 });
+

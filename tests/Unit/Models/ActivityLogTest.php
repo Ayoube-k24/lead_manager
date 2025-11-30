@@ -7,11 +7,6 @@ use App\Models\Form;
 use App\Models\Lead;
 use App\Models\User;
 
-beforeEach(function () {
-    require_once __DIR__.'/../../Feature/Sprint1/EnsureMigrationsRun.php';
-    ensureMigrationsRun();
-});
-
 describe('ActivityLog Model - Basic Properties', function () {
     test('can be created with all required fields', function () {
         // Arrange
@@ -220,3 +215,4 @@ describe('ActivityLog Model - Common Actions', function () {
             ->and($log->ip_address)->toBe('192.168.1.1');
     });
 });
+

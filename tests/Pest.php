@@ -15,6 +15,22 @@ pest()->extend(Tests\TestCase::class)
     ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
     ->in('Feature');
 
+pest()->extend(Tests\TestCase::class)
+    ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
+    ->in('Unit');
+
+// Disable model events during migrations for Unit tests to prevent recursion
+beforeEach(function () {
+    // Disable model events before migrations run
+    \Illuminate\Database\Eloquent\Model::unsetEventDispatcher();
+})->in('Unit');
+
+// Re-enable model events after migrations
+afterEach(function () {
+    // Re-enable model events after migrations
+    \Illuminate\Database\Eloquent\Model::setEventDispatcher($this->app['events']);
+})->in('Unit');
+
 // Ensure migrations run correctly in all Feature tests
 beforeEach(function () {
     // Only run for Feature tests (already filtered by ->in('Feature'))

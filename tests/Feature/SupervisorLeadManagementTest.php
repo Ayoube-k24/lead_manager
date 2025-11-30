@@ -366,3 +366,4 @@ describe('Supervisor Lead Management - Authorization', function () {
         $response->assertRedirect(route('login'));
     });
 });
+

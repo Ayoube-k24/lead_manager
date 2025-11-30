@@ -300,3 +300,4 @@ public function updateTag(Tag $tag, array $data): Tag
 
 **Conclusion** : La gestion des tags est un élément essentiel manquant qui doit être implémenté en priorité pour compléter le Sprint 8.
 
+

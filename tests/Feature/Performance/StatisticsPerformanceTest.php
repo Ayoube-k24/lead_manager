@@ -165,3 +165,4 @@ describe('Performance - Statistics Calculation', function () {
         expect($queries[0]['query'])->toContain('count(*)'); // Using COUNT aggregation
     });
 });
+

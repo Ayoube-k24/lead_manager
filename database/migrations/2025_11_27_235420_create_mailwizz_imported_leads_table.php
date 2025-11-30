@@ -32,3 +32,4 @@ return new class extends Migration
         Schema::dropIfExists('mailwizz_imported_leads');
     }
 };
+

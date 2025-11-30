@@ -5,12 +5,12 @@ declare(strict_types=1);
 use App\LeadStatus;
 
 describe('LeadStatus Enum - All Statuses', function () {
-    test('has exactly 18 status cases', function () {
+    test('has exactly 16 status cases', function () {
         // Act
         $statuses = LeadStatus::cases();
 
         // Assert
-        expect($statuses)->toHaveCount(18);
+        expect($statuses)->toHaveCount(16);
     });
 
     test('all statuses have unique values', function () {
@@ -206,7 +206,7 @@ describe('LeadStatus Enum - Options', function () {
 
         // Assert
         expect($options)->toBeArray()
-            ->and($options)->toHaveCount(18)
+            ->and($options)->toHaveCount(16)
             ->and($options)->toHaveKey('pending_email')
             ->and($options)->toHaveKey('email_confirmed')
             ->and($options)->toHaveKey('pending_call')

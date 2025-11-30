@@ -221,3 +221,4 @@ describe('Model - Feature Group', function () {
 **Dernière mise à jour** : 2025-01-27  
 **Prochaine étape** : Phase 4 - Tests Feature Leads
 
+

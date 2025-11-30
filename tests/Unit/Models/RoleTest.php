@@ -131,3 +131,4 @@ describe('Role Model - Standard Roles', function () {
         expect($role->slug)->toBe('agent');
     });
 });
+

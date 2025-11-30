@@ -121,3 +121,4 @@ La désactivation de compte fonctionne maintenant correctement :
 3. ✅ Les agents désactivés sont **exclus de la distribution automatique** des leads
 4. ✅ Messages d'erreur **clairs et informatifs** pour l'utilisateur
 
+

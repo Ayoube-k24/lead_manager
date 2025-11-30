@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Queue;
 describe('Public Form Submission - Successful Submission', function () {
     test('form can be submitted publicly', function () {
         // Arrange
+        Queue::fake();
         $smtpProfile = SmtpProfile::factory()->create();
         $emailTemplate = EmailTemplate::factory()->create();
 
@@ -53,6 +54,7 @@ describe('Public Form Submission - Successful Submission', function () {
 
     test('creates lead with correct data', function () {
         // Arrange
+        Queue::fake();
         $smtpProfile = SmtpProfile::factory()->create();
         $emailTemplate = EmailTemplate::factory()->create();
         $callCenter = CallCenter::factory()->create();
@@ -115,6 +117,7 @@ describe('Public Form Submission - Successful Submission', function () {
 describe('Public Form Submission - Validation', function () {
     test('form submission validates required fields', function () {
         // Arrange
+        Queue::fake();
         $smtpProfile = SmtpProfile::factory()->create();
         $emailTemplate = EmailTemplate::factory()->create();
 
@@ -327,6 +330,4 @@ describe('Public Form Submission - Route', function () {
         $url = route('forms.submit', $form);
 
         // Assert
-        expect($url)->toContain($form->uid);
-    });
-});
+        expect($url)->toContain($f

@@ -216,3 +216,4 @@ describe('ApiToken Model - Uniqueness', function () {
         ]))->toThrow(\Illuminate\Database\QueryException::class);
     });
 });
+

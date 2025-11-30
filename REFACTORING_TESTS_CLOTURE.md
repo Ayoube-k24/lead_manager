@@ -264,3 +264,4 @@ Le projet Lead Manager dispose maintenant d'une suite de tests :
 **Date de clôture** : 2025-01-27  
 **Statut** : ✅ **PROJET TERMINÉ AVEC SUCCÈS**
 
+

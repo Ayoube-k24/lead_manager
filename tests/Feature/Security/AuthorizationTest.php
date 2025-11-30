@@ -256,3 +256,4 @@ describe('Authorization - API Permissions', function () {
         $response->assertStatus(200); // Or 403 if controller checks role
     });
 });
+

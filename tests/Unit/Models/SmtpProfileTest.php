@@ -177,3 +177,4 @@ describe('SmtpProfile Model - Port Validation', function () {
         expect($smtpProfile->port)->toBe(25);
     });
 });
+

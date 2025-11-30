@@ -168,3 +168,4 @@ describe('Performance - Search', function () {
             ->and($lastQuery['query'])->toContain('assigned_to');
     });
 });
+

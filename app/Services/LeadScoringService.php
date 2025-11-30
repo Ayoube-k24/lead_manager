@@ -96,11 +96,12 @@ class LeadScoringService
 
         $result = $this->calculateScore($lead);
 
-        $lead->update([
-            'score' => $result['score'],
-            'score_updated_at' => now(),
-            'score_factors' => $result['factors'],
-        ]);
+        // Use saveQuietly to avoid triggering observers and events
+        // This prevents infinite loops when the observer calls this method
+        $lead->score = $result['score'];
+        $lead->score_updated_at = now();
+        $lead->score_factors = $result['factors'];
+        $lead->saveQuietly();
 
         return $lead->fresh();
     }

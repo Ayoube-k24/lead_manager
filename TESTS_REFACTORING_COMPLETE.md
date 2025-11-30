@@ -282,3 +282,4 @@ La refactorisation complète des tests est **TERMINÉE**. Le projet dispose main
 
 **Note** : Pour exécuter les tests, utilisez `php artisan test`. Les tests de performance peuvent prendre plus de temps à s'exécuter.
 
+

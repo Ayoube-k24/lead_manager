@@ -28,7 +28,11 @@ class LeadObserver
      */
     public function saved(Lead $lead): void
     {
-        $this->attemptDistribution($lead);
+        // Only attempt distribution if status is email_confirmed
+        // This prevents unnecessary processing during initial creation
+        if ($lead->status === 'email_confirmed' && ! $lead->assigned_to) {
+            $this->attemptDistribution($lead);
+        }
     }
 
     /**
@@ -186,7 +190,7 @@ class LeadObserver
             try {
                 // Load necessary relationships before calculation
                 $lead->loadMissing(['form', 'notes', 'reminders', 'tags']);
-                
+
                 $this->scoringService->updateScore($lead);
                 Log::debug('Lead score recalculated', [
                     'lead_id' => $lead->id,
@@ -210,6 +214,13 @@ class LeadObserver
     protected function shouldRecalculateOnUpdate(Lead $lead, array $config): bool
     {
         $changes = $lead->getChanges();
+
+        // Don't recalculate if only score-related fields changed (prevents infinite loop)
+        $scoreFields = ['score', 'score_updated_at', 'score_factors'];
+        $onlyScoreChanged = ! empty($changes) && count(array_diff_key($changes, array_flip($scoreFields))) === 0;
+        if ($onlyScoreChanged) {
+            return false;
+        }
 
         // Recalculate on email confirmation
         if (($config['on_email_confirmation'] ?? true) && isset($changes['email_confirmed_at'])) {

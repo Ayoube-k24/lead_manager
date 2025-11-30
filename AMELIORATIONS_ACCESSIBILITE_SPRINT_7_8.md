@@ -103,3 +103,4 @@
 
 **Conclusion** : Toutes les fonctionnalités des sprints 7 et 8 sont maintenant facilement accessibles depuis les dashboards et la sidebar, améliorant significativement l'expérience utilisateur.
 
+

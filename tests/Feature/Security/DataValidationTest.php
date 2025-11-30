@@ -277,3 +277,4 @@ describe('Data Validation - Special Characters', function () {
         expect($lead->data['name'])->toBe("O'Brien & Associates <test>");
     });
 });
+
