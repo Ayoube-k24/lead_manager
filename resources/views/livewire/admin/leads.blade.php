@@ -46,6 +46,8 @@ new class extends Component
 
     public ?bool $noTags = null;
 
+    public array $sourceFilter = [];
+
     public bool $showAdvancedFilters = false;
 
     public function mount(Request $request): void
@@ -76,6 +78,11 @@ new class extends Component
         $this->resetPage();
     }
 
+    public function updatingSourceFilter(): void
+    {
+        $this->resetPage();
+    }
+
     public function getLeadsProperty()
     {
         $service = app(LeadSearchService::class);
@@ -96,6 +103,7 @@ new class extends Component
             'tags' => ! empty($this->tagsFilter) ? $this->tagsFilter : null,
             'tags_mode' => $this->tagsMode,
             'no_tags' => $this->noTags,
+            'source' => ! empty($this->sourceFilter) ? $this->sourceFilter : null,
         ];
 
         // Remove null values
@@ -149,6 +157,7 @@ new class extends Component
         $this->tagsFilter = [];
         $this->tagsMode = 'any';
         $this->noTags = null;
+        $this->sourceFilter = [];
         $this->resetPage();
     }
 
@@ -213,7 +222,7 @@ new class extends Component
         <div class="flex items-center justify-between">
             <h3 class="text-lg font-semibold">{{ __('Recherche et Filtres') }}</h3>
             <div class="flex items-center gap-2">
-                @if ($search || !empty($statusFilter) || $callCenterFilter || $formFilter || $assignedToFilter || $createdFrom || $createdTo || $emailConfirmedFrom || $emailConfirmedTo || $calledFrom || $calledTo || $emailConfirmed !== null || $hasNotes !== null || !empty($tagsFilter) || $noTags !== null)
+                @if ($search || !empty($statusFilter) || $callCenterFilter || $formFilter || $assignedToFilter || $createdFrom || $createdTo || $emailConfirmedFrom || $emailConfirmedTo || $calledFrom || $calledTo || $emailConfirmed !== null || $hasNotes !== null || !empty($tagsFilter) || $noTags !== null || !empty($sourceFilter))
                     <flux:button wire:click="clearFilters" variant="ghost" size="sm" icon="x-mark">
                         {{ __('Réinitialiser') }}
                     </flux:button>
@@ -243,6 +252,39 @@ new class extends Component
                     <option value="{{ $form->id }}">{{ $form->name }}</option>
                 @endforeach
             </flux:select>
+            <div>
+                <label class="mb-2 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                    {{ __('Source') }}
+                </label>
+                <div class="flex flex-wrap gap-2">
+                    <button
+                        wire:click="
+                            @if(in_array('form', $sourceFilter))
+                                $set('sourceFilter', array_values(array_diff($sourceFilter, ['form'])))
+                            @else
+                                $set('sourceFilter', array_merge($sourceFilter, ['form']))
+                            @endif
+                        "
+                        type="button"
+                        class="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition-all {{ in_array('form', $sourceFilter) ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-500 ring-offset-2' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700' }}"
+                    >
+                        {{ __('Formulaire') }}
+                    </button>
+                    <button
+                        wire:click="
+                            @if(in_array('leads_seo', $sourceFilter))
+                                $set('sourceFilter', array_values(array_diff($sourceFilter, ['leads_seo'])))
+                            @else
+                                $set('sourceFilter', array_merge($sourceFilter, ['leads_seo']))
+                            @endif
+                        "
+                        type="button"
+                        class="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition-all {{ in_array('leads_seo', $sourceFilter) ? 'bg-green-600 text-white shadow-md ring-2 ring-green-500 ring-offset-2' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700' }}"
+                    >
+                        {{ __('Leads SEO') }}
+                    </button>
+                </div>
+            </div>
         </div>
         
         <!-- Nuage de tags pour les statuts -->

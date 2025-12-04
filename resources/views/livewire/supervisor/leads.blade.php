@@ -19,6 +19,10 @@ new class extends Component
 
     public string $tagsMode = 'any';
 
+    public ?string $sourceFilter = null;
+
+    public string $activeTab = 'form'; // 'form' or 'leads_seo'
+
     public function mount(): void
     {
         //
@@ -34,6 +38,17 @@ new class extends Component
         $this->resetPage();
     }
 
+    public function updatingSourceFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function switchTab(string $tab): void
+    {
+        $this->activeTab = $tab;
+        $this->resetPage();
+    }
+
     public function getLeadsProperty()
     {
         $supervisor = Auth::user();
@@ -43,7 +58,11 @@ new class extends Component
             ->whereHas('role', fn ($q) => $q->where('slug', 'agent'))
             ->pluck('id');
 
+        // Filtrer par source selon l'onglet actif
+        $source = $this->activeTab === 'form' ? 'form' : 'leads_seo';
+
         $query = Lead::whereIn('assigned_to', $agentIds)
+            ->where('source', $source)
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
                     $q->where('email', 'like', '%'.$this->search.'%')
@@ -70,6 +89,32 @@ new class extends Component
         return $query->latest()->paginate(15);
     }
 
+    public function getStatsProperty(): array
+    {
+        $supervisor = Auth::user();
+        $agentIds = User::where('supervisor_id', $supervisor->id)
+            ->whereHas('role', fn ($q) => $q->where('slug', 'agent'))
+            ->pluck('id');
+
+        $formLeads = Lead::whereIn('assigned_to', $agentIds)->where('source', 'form')->get();
+        $seoLeads = Lead::whereIn('assigned_to', $agentIds)->where('source', 'leads_seo')->get();
+
+        return [
+            'form' => [
+                'total' => $formLeads->count(),
+                'confirmed' => $formLeads->where('status', 'confirmed')->count(),
+                'rejected' => $formLeads->where('status', 'rejected')->count(),
+                'pending' => $formLeads->whereIn('status', ['pending_email', 'email_confirmed', 'pending_call', 'callback_pending'])->count(),
+            ],
+            'leads_seo' => [
+                'total' => $seoLeads->count(),
+                'confirmed' => $seoLeads->where('status', 'confirmed')->count(),
+                'rejected' => $seoLeads->where('status', 'rejected')->count(),
+                'pending' => $seoLeads->whereIn('status', ['pending_email', 'email_confirmed', 'pending_call', 'callback_pending'])->count(),
+            ],
+        ];
+    }
+
     public function getTagsProperty()
     {
         $supervisor = Auth::user();
@@ -90,6 +135,55 @@ new class extends Component
             <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
                 {{ __('Tous les leads assignés aux agents sous votre supervision') }}
             </p>
+        </div>
+    </div>
+
+    <!-- Onglets de source -->
+    <div class="border-b border-neutral-200 dark:border-neutral-700">
+        <nav class="-mb-px flex space-x-8">
+            <button
+                wire:click="switchTab('form')"
+                type="button"
+                class="whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium transition-colors {{ $activeTab === 'form' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-neutral-500 hover:border-neutral-300 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300' }}"
+            >
+                {{ __('Leads Formulaire') }}
+                <span class="ml-2 rounded-full bg-neutral-100 px-2 py-0.5 text-xs dark:bg-neutral-800">
+                    {{ $this->stats['form']['total'] }}
+                </span>
+            </button>
+            <button
+                wire:click="switchTab('leads_seo')"
+                type="button"
+                class="whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium transition-colors {{ $activeTab === 'leads_seo' ? 'border-green-500 text-green-600 dark:text-green-400' : 'border-transparent text-neutral-500 hover:border-neutral-300 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300' }}"
+            >
+                {{ __('Leads SEO') }}
+                <span class="ml-2 rounded-full bg-neutral-100 px-2 py-0.5 text-xs dark:bg-neutral-800">
+                    {{ $this->stats['leads_seo']['total'] }}
+                </span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- Statistiques par source -->
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
+        @php
+            $currentStats = $this->stats[$activeTab];
+        @endphp
+        <div class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
+            <div class="text-xs font-medium text-neutral-600 dark:text-neutral-400">{{ __('Total') }}</div>
+            <div class="mt-1 text-xl font-bold text-neutral-900 dark:text-neutral-100">{{ $currentStats['total'] }}</div>
+        </div>
+        <div class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
+            <div class="text-xs font-medium text-neutral-600 dark:text-neutral-400">{{ __('Confirmés') }}</div>
+            <div class="mt-1 text-xl font-bold text-green-600 dark:text-green-400">{{ $currentStats['confirmed'] }}</div>
+        </div>
+        <div class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
+            <div class="text-xs font-medium text-neutral-600 dark:text-neutral-400">{{ __('Rejetés') }}</div>
+            <div class="mt-1 text-xl font-bold text-red-600 dark:text-red-400">{{ $currentStats['rejected'] }}</div>
+        </div>
+        <div class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
+            <div class="text-xs font-medium text-neutral-600 dark:text-neutral-400">{{ __('En attente') }}</div>
+            <div class="mt-1 text-xl font-bold text-orange-600 dark:text-orange-400">{{ $currentStats['pending'] }}</div>
         </div>
     </div>
 

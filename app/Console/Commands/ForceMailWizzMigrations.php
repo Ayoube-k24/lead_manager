@@ -33,7 +33,7 @@ class ForceMailWizzMigrations extends Command
             if (Schema::hasTable('leads') && ! Schema::hasColumn('leads', 'source')) {
                 Schema::table('leads', function ($table) {
                     $table->string('source')->default('form')->after('form_id')
-                        ->comment('Source du lead: form, mailwizz_seo, etc.');
+                        ->comment('Source du lead: form, leads_seo, etc.');
                     $table->index('source');
                 });
                 $this->info('✓ Colonne source ajoutée à la table leads.');

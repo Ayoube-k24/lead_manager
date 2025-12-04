@@ -72,9 +72,14 @@ new class extends Component {
                 {{ __('Gérez les configurations d\'import MailWizz') }}
             </p>
         </div>
-        <flux:button href="{{ route('admin.mailwizz.create') }}" variant="primary" wire:navigate>
-            {{ __('Nouvelle configuration') }}
-        </flux:button>
+        <div class="flex items-center gap-2">
+            <flux:button href="{{ route('admin.mailwizz.import-manual') }}" variant="ghost" wire:navigate>
+                {{ __('Import manuel CSV') }}
+            </flux:button>
+            <flux:button href="{{ route('admin.mailwizz.create') }}" variant="primary" wire:navigate>
+                {{ __('Nouvelle configuration') }}
+            </flux:button>
+        </div>
     </div>
 
     <!-- Messages flash -->
@@ -177,5 +182,6 @@ new class extends Component {
         </div>
     @endif
 </div>
+
 
 

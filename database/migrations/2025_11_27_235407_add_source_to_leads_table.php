@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('leads', function (Blueprint $table) {
             $table->string('source')->default('form')->after('form_id')
-                ->comment('Source du lead: form, mailwizz_seo, etc.');
+                ->comment('Source du lead: form, leads_seo, etc.');
             $table->index('source');
         });
     }

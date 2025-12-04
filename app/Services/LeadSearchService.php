@@ -21,10 +21,10 @@ class LeadSearchService
         if (! empty($query)) {
             $leadsQuery->where(function ($q) use ($query) {
                 $q->where('email', 'like', "%{$query}%")
-                    ->orWhereJsonContains('data->name', $query)
-                    ->orWhereJsonContains('data->phone', $query)
-                    ->orWhereJsonContains('data->telephone', $query)
-                    ->orWhereJsonContains('data->tel', $query);
+                    ->orWhere('data', 'like', "%\"name\":\"%{$query}%\"%")
+                    ->orWhere('data', 'like', "%\"phone\":\"%{$query}%\"%")
+                    ->orWhere('data', 'like', "%\"telephone\":\"%{$query}%\"%")
+                    ->orWhere('data', 'like', "%\"tel\":\"%{$query}%\"%");
             });
         }
 
@@ -45,10 +45,10 @@ class LeadSearchService
         // Filter by status (support both slug and status_id)
         if (! empty($filters['status'])) {
             $statuses = is_array($filters['status']) ? $filters['status'] : [$filters['status']];
-            
+
             // Try to find status IDs from slugs
             $statusIds = \App\Models\LeadStatus::whereIn('slug', $statuses)->pluck('id')->toArray();
-            
+
             if (! empty($statusIds)) {
                 $query->whereIn('status_id', $statusIds);
             } else {
@@ -59,10 +59,16 @@ class LeadSearchService
 
         // Filter by date range (created_at)
         if (! empty($filters['created_from'])) {
-            $query->where('created_at', '>=', $filters['created_from']);
+            $fromDate = is_string($filters['created_from'])
+                ? \Carbon\Carbon::parse($filters['created_from'])->startOfDay()
+                : \Carbon\Carbon::parse($filters['created_from'])->startOfDay();
+            $query->where('created_at', '>=', $fromDate);
         }
         if (! empty($filters['created_to'])) {
-            $query->where('created_at', '<=', $filters['created_to']);
+            $toDate = is_string($filters['created_to'])
+                ? \Carbon\Carbon::parse($filters['created_to'])->endOfDay()
+                : \Carbon\Carbon::parse($filters['created_to'])->endOfDay();
+            $query->where('created_at', '<=', $toDate);
         }
 
         // Filter by email confirmation date
@@ -141,6 +147,12 @@ class LeadSearchService
             $query->whereDoesntHave('tags');
         }
 
+        // Filter by source
+        if (! empty($filters['source'])) {
+            $sources = is_array($filters['source']) ? $filters['source'] : [$filters['source']];
+            $query->whereIn('source', $sources);
+        }
+
         return $query;
     }
 
@@ -216,6 +228,14 @@ class LeadSearchService
             'no_tags' => [
                 'type' => 'boolean',
                 'label' => __('Sans tags'),
+            ],
+            'source' => [
+                'type' => 'multi-select',
+                'label' => __('Source'),
+                'options' => [
+                    'form' => __('Formulaire'),
+                    'leads_seo' => __('Leads SEO'),
+                ],
             ],
         ];
     }

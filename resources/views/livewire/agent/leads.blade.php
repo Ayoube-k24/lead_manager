@@ -18,6 +18,8 @@ new class extends Component
 
     public string $tagsMode = 'any';
 
+    public ?string $sourceFilter = null;
+
     public function mount(): void
     {
         //
@@ -29,6 +31,11 @@ new class extends Component
     }
 
     public function updatingStatusFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingSourceFilter(): void
     {
         $this->resetPage();
     }
@@ -48,6 +55,9 @@ new class extends Component
             })
             ->when($this->statusFilter, function ($query) {
                 $query->where('status', $this->statusFilter);
+            })
+            ->when($this->sourceFilter, function ($query) {
+                $query->where('source', $this->sourceFilter);
             })
             ->when(! empty($this->tagsFilter), function ($query) {
                 $tagIds = array_filter(array_map('intval', $this->tagsFilter));
@@ -241,6 +251,36 @@ new class extends Component
                         {{ $status->getLabel() }}
                     </button>
                 @endforeach
+            </div>
+        </div>
+
+        <!-- Filtre par source -->
+        <div>
+            <label class="mb-2 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                {{ __('Source') }}
+            </label>
+            <div class="flex flex-wrap gap-2">
+                <button
+                    wire:click="$set('sourceFilter', null)"
+                    type="button"
+                    class="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition-all {{ $sourceFilter === null ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-500 ring-offset-2' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700' }}"
+                >
+                    {{ __('Tous') }}
+                </button>
+                <button
+                    wire:click="$set('sourceFilter', 'form')"
+                    type="button"
+                    class="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition-all {{ $sourceFilter === 'form' ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-500 ring-offset-2' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700' }}"
+                >
+                    {{ __('Formulaire') }}
+                </button>
+                <button
+                    wire:click="$set('sourceFilter', 'leads_seo')"
+                    type="button"
+                    class="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition-all {{ $sourceFilter === 'leads_seo' ? 'bg-green-600 text-white shadow-md ring-2 ring-green-500 ring-offset-2' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700' }}"
+                >
+                    {{ __('Leads SEO') }}
+                </button>
             </div>
         </div>
 

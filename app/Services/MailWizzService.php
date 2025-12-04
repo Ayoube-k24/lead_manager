@@ -55,6 +55,55 @@ class MailWizzService
     }
 
     /**
+     * Prepare lead data from MailWizz subscriber data.
+     * Imports all fields from the subscriber, normalizing common field names.
+     *
+     * @param  array<string, mixed>  $subscriber
+     * @return array<string, mixed>
+     */
+    protected function prepareLeadData(array $subscriber, string $subscriberId): array
+    {
+        // Champs système à exclure (déjà traités séparément)
+        $excludedFields = ['subscriber_uid', 'uid', 'email'];
+
+        // Normalisation des noms de champs courants pour compatibilité
+        $fieldMappings = [
+            'FNAME' => 'first_name',
+            'LNAME' => 'last_name',
+            'PHONE' => 'phone',
+        ];
+
+        $leadData = [
+            'mailwizz_subscriber_id' => $subscriberId,
+        ];
+
+        // Parcourir tous les champs du subscriber
+        foreach ($subscriber as $key => $value) {
+            $keyLower = strtolower($key);
+
+            // Ignorer les champs système
+            if (in_array($keyLower, array_map('strtolower', $excludedFields))) {
+                continue;
+            }
+
+            // Normaliser les noms de champs courants
+            $normalizedKey = $fieldMappings[strtoupper($key)] ?? $key;
+
+            // Ajouter le champ normalisé
+            if ($normalizedKey !== $key) {
+                // Si normalisé, ajouter les deux versions
+                $leadData[$normalizedKey] = $value;
+                $leadData['mailwizz_'.$key] = $value; // Conserver l'original avec préfixe
+            } else {
+                // Sinon, ajouter tel quel
+                $leadData[$key] = $value;
+            }
+        }
+
+        return $leadData;
+    }
+
+    /**
      * Get subscribers from MailWizz list.
      *
      * @return array<int, array<string, mixed>>
@@ -175,20 +224,22 @@ class MailWizzService
                             continue;
                         }
 
-                        // Créer le lead
+                        // Préparer les données du lead avec tous les champs du subscriber
+                        $leadData = $this->prepareLeadData($subscriber, $subscriberId);
+
+                        // Obtenir le statut email_confirmed (les leads MailWizz n'ont pas besoin de confirmation d'email)
+                        $emailConfirmedStatus = \App\Models\LeadStatus::getBySlug('email_confirmed');
+
+                        // Créer le lead avec statut email_confirmed directement
+                        // Les leads MailWizz sont déjà dans une liste, donc l'email est considéré comme confirmé
                         $lead = Lead::create([
                             'email' => $email,
-                            'source' => 'mailwizz_seo',
-                            'status' => 'pending_email',
+                            'source' => 'leads_seo',
+                            'status' => $emailConfirmedStatus ? $emailConfirmedStatus->slug : 'email_confirmed',
+                            'status_id' => $emailConfirmedStatus?->id,
+                            'email_confirmed_at' => now(), // Marquer comme confirmé immédiatement
                             'call_center_id' => $config->call_center_id,
-                            'data' => [
-                                'first_name' => $subscriber['FNAME'] ?? $subscriber['first_name'] ?? null,
-                                'last_name' => $subscriber['LNAME'] ?? $subscriber['last_name'] ?? null,
-                                'phone' => $subscriber['phone'] ?? $subscriber['PHONE'] ?? null,
-                                'mailwizz_subscriber_id' => $subscriberId,
-                                'clicked_url' => $subscriber['clicked_url'] ?? null,
-                                'clicked_at' => $subscriber['clicked_at'] ?? null,
-                            ],
+                            'data' => $leadData,
                         ]);
 
                         // Enregistrer dans mailwizz_imported_leads
@@ -241,4 +292,3 @@ class MailWizzService
         return $stats;
     }
 }
-

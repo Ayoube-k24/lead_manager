@@ -224,6 +224,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('admin.mailwizz.create');
         Volt::route('admin/mailwizz/{config}/edit', 'admin.mailwizz.edit')
             ->name('admin.mailwizz.edit');
+        Volt::route('admin/mailwizz/import-manual', 'admin.mailwizz.import-manual')
+            ->name('admin.mailwizz.import-manual');
 
         // API Tokens and Documentation
         Volt::route('admin/api-tokens', 'admin.api-tokens')

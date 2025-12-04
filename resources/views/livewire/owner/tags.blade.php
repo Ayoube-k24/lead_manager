@@ -51,8 +51,12 @@ new class extends Component {
                 ->orWhere('description', 'like', "%{$this->search}%"))
             ->when($this->filterCategoryId, fn ($q) => $q->where('category_id', $this->filterCategoryId))
             ->when($callCenter, function ($query) use ($callCenter) {
-                $query->whereHas('leads', function ($q) use ($callCenter) {
-                    $q->where('call_center_id', $callCenter->id);
+                // Afficher les tags qui sont soit utilisés dans ce call center, soit pas encore utilisés
+                $query->where(function ($q) use ($callCenter) {
+                    $q->whereHas('leads', function ($subQ) use ($callCenter) {
+                        $subQ->where('call_center_id', $callCenter->id);
+                    })
+                    ->orDoesntHave('leads'); // Tags sans leads (nouveaux tags)
                 });
             })
             ->orderBy('name');
@@ -139,7 +143,7 @@ new class extends Component {
         $user = Auth::user();
         $callCenter = $user->callCenter;
 
-        // Get tags used in this call center
+        // Get tags: either used in this call center OR not used anywhere yet (new tags)
         $tags = Tag::query()
             ->with(['category'])
             ->withCount(['leads' => function ($query) use ($callCenter) {
@@ -151,8 +155,12 @@ new class extends Component {
                 ->orWhere('description', 'like', "%{$this->search}%"))
             ->when($this->filterCategoryId, fn ($query) => $query->where('category_id', $this->filterCategoryId))
             ->when($callCenter, function ($query) use ($callCenter) {
-                $query->whereHas('leads', function ($q) use ($callCenter) {
-                    $q->where('call_center_id', $callCenter->id);
+                // Afficher les tags qui sont soit utilisés dans ce call center, soit pas encore utilisés
+                $query->where(function ($q) use ($callCenter) {
+                    $q->whereHas('leads', function ($subQ) use ($callCenter) {
+                        $subQ->where('call_center_id', $callCenter->id);
+                    })
+                    ->orDoesntHave('leads'); // Tags sans leads (nouveaux tags)
                 });
             })
             ->orderBy('name')
@@ -384,69 +392,6 @@ new class extends Component {
                         @endforeach
                     </tbody>
                 </table>
-            </div>
-
-            <div class="border-t border-neutral-200 p-4 dark:border-neutral-700">
-                {{ $tags->links() }}
-            </div>
-        @else
-            <div class="p-12 text-center">
-                <p class="text-neutral-500 dark:text-neutral-400">{{ __('Aucun tag trouvé') }}</p>
-                <flux:button href="{{ route('owner.tags.create') }}" variant="primary" class="mt-4" wire:navigate>
-                    {{ __('Créer le premier tag') }}
-                </flux:button>
-            </div>
-        @endif
-    </div>
-
-                        <div class="flex h-10 w-10 items-center justify-center rounded-full" style="background-color: {{ $tag->color }}20;">
-                            <div class="h-4 w-4 rounded-full" style="background-color: {{ $tag->color }};"></div>
-                        </div>
-
-                        <div class="flex-1">
-                            <div class="flex items-center gap-2">
-                                <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">
-                                    {{ $tag->name }}
-                                </h3>
-                                @if ($tag->is_system)
-                                    <flux:badge variant="primary" size="sm">{{ __('Système') }}</flux:badge>
-                                @endif
-                                @if ($tag->category)
-                                    <flux:badge variant="ghost" size="sm">{{ $tag->category->name }}</flux:badge>
-                                @endif
-                            </div>
-                            @if ($tag->description)
-                                <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-                                    {{ $tag->description }}
-                                </p>
-                            @endif
-                            <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-500">
-                                {{ __('Utilisé sur :count lead(s)', ['count' => $tag->leads_count]) }}
-                            </p>
-                        </div>
-
-                        <div class="flex items-center gap-2">
-                            <flux:button 
-                                href="{{ route('owner.tags.edit', $tag) }}" 
-                                variant="ghost" 
-                                size="sm"
-                                wire:navigate
-                            >
-                                {{ __('Modifier') }}
-                            </flux:button>
-                            @if (! $tag->is_system)
-                                <flux:button 
-                                    wire:click="delete({{ $tag->id }})" 
-                                    wire:confirm="{{ __('Êtes-vous sûr de vouloir supprimer ce tag ?') }}"
-                                    variant="danger" 
-                                    size="sm"
-                                >
-                                    {{ __('Supprimer') }}
-                                </flux:button>
-                            @endif
-                        </div>
-                    </div>
-                @endforeach
             </div>
 
             <div class="border-t border-neutral-200 p-4 dark:border-neutral-700">
