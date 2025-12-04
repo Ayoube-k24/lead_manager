@@ -169,7 +169,8 @@ document.getElementById('leadForm').addEventListener('submit', async (event) => 
             <li>{{ __('Toutes les requêtes doivent être envoyées en HTTPS.') }}</li>
             <li>{{ __('Le champ email est requis pour déclencher le double opt-in.') }}</li>
             <li>{{ __('Le taux de réussite dépend de la configuration SMTP et des templates email associés.') }}</li>
-            <li>{{ __('Récupérez l’UID depuis la page d’édition du formulaire ou cette page.') }}</li>
+            <li>{{ __('Récupérez l\'UID depuis la page d\'édition du formulaire ou cette page.') }}</li>
+            <li>{{ __('✅ Support CORS activé : vous pouvez soumettre des formulaires depuis n\'importe quel domaine externe (landing pages).') }}</li>
         </ul>
     </div>
 </div>

@@ -37,14 +37,20 @@ class PublicFormController extends Controller
 
             return response()->json([
                 'message' => 'Ce formulaire n\'est pas actif.',
-            ], 403);
+            ], 403)
+                ->header('Access-Control-Allow-Origin', '*')
+                ->header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+                ->header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization, X-Requested-With');
         }
 
         // Check if form has SMTP profile and email template
         if (! $form->smtp_profile_id || ! $form->email_template_id) {
             return response()->json([
                 'message' => 'Ce formulaire n\'est pas configuré correctement.',
-            ], 400);
+            ], 400)
+                ->header('Access-Control-Allow-Origin', '*')
+                ->header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+                ->header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization, X-Requested-With');
         }
 
         // Validate form data
@@ -60,7 +66,10 @@ class PublicFormController extends Controller
             return response()->json([
                 'message' => 'Les données soumises sont invalides.',
                 'errors' => $e->errors(),
-            ], 422);
+            ], 422)
+                ->header('Access-Control-Allow-Origin', '*')
+                ->header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+                ->header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization, X-Requested-With');
         }
 
         // Extract email from data
@@ -73,7 +82,10 @@ class PublicFormController extends Controller
         if (! $email) {
             return response()->json([
                 'message' => 'Une adresse email est requise.',
-            ], 422);
+            ], 422)
+                ->header('Access-Control-Allow-Origin', '*')
+                ->header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+                ->header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization, X-Requested-With');
         }
 
         // Create lead with call center association
@@ -105,6 +117,9 @@ class PublicFormController extends Controller
         return response()->json([
             'message' => 'Votre formulaire a été soumis avec succès. Veuillez vérifier votre email pour confirmer votre inscription.',
             'lead_id' => $lead->id,
-        ], 201);
+        ], 201)
+            ->header('Access-Control-Allow-Origin', '*')
+            ->header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+            ->header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization, X-Requested-With');
     }
 }

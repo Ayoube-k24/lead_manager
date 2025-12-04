@@ -21,6 +21,15 @@ Route::get('/login', function () {
 })->name('login');
 
 // Sprint 3: Routes publiques pour les formulaires et confirmation email
+// Handle CORS preflight requests
+Route::options('forms/{form:uid}/submit', function () {
+    return response('', 200)
+        ->header('Access-Control-Allow-Origin', '*')
+        ->header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        ->header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization, X-Requested-With')
+        ->header('Access-Control-Max-Age', '86400');
+});
+
 Route::post('forms/{form:uid}/submit', [\App\Http\Controllers\PublicFormController::class, 'submit'])
     ->middleware('throttle:form-submission')
     ->name('forms.submit');

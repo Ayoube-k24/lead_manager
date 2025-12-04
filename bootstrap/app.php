@@ -17,6 +17,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => \App\Http\Middleware\EnsureUserHasRole::class,
         ]);
 
+        // Add CORS middleware for public form submissions (must be prepended)
+        $middleware->web(prepend: [
+            \App\Http\Middleware\HandleCors::class,
+        ]);
+
         // Vérifier que les utilisateurs connectés sont actifs
         $middleware->web(append: [
             \App\Http\Middleware\EnsureUserIsActive::class,

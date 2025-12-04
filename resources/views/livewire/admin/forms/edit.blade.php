@@ -476,6 +476,7 @@ $('#leadForm').on('submit', async function(e) {
                         <li>{{ __('Un champ email est requis pour créer un lead') }}</li>
                         <li>{{ __('En cas de succès, un email de confirmation sera envoyé au lead') }}</li>
                         <li>{{ __('Les erreurs de validation retournent un code 422 avec les détails') }}</li>
+                        <li>{{ __('✅ Support CORS activé : soumission possible depuis n\'importe quel domaine externe') }}</li>
                     </ul>
                 </div>
             </div>
