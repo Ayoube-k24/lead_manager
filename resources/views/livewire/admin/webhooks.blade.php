@@ -134,6 +134,247 @@ new class extends Component {
             {{ __('Nouveau webhook') }}
         </flux:button>
     </div>
+        <div class="rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
+            <div class="border-b border-neutral-200 p-6 dark:border-neutral-700">
+                <h2 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{{ __('Guide complet des webhooks') }}</h2>
+                <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">{{ __('Tout ce que vous devez savoir pour créer et utiliser les webhooks') }}</p>
+            </div>
+
+            <div class="divide-y divide-neutral-200 dark:divide-neutral-700">
+                <!-- Qu'est-ce qu'un webhook -->
+                <div class="p-6">
+                    <h3 class="text-base font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
+                        🔔 {{ __('Qu\'est-ce qu\'un webhook ?') }}
+                    </h3>
+                    <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-3">
+                        {{ __('Un webhook est un mécanisme qui permet à Lead Manager d\'envoyer automatiquement des notifications HTTP à votre application externe lorsqu\'un événement se produit (ex: création d\'un lead, confirmation d\'email, etc.).') }}
+                    </p>
+                    <div class="space-y-2 text-sm text-neutral-600 dark:text-neutral-400">
+                        <div class="flex items-start gap-2">
+                            <span class="text-green-500">✅</span>
+                            <div>
+                                <strong class="text-neutral-900 dark:text-neutral-100">{{ __('Temps réel') }}</strong> - {{ __('Recevez les notifications instantanément') }}
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <span class="text-green-500">✅</span>
+                            <div>
+                                <strong class="text-neutral-900 dark:text-neutral-100">{{ __('Automatisation') }}</strong> - {{ __('Intégrez Lead Manager avec votre CRM, système de facturation, etc.') }}
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <span class="text-green-500">✅</span>
+                            <div>
+                                <strong class="text-neutral-900 dark:text-neutral-100">{{ __('Fiabilité') }}</strong> - {{ __('Système de retry automatique en cas d\'échec') }}
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <span class="text-green-500">✅</span>
+                            <div>
+                                <strong class="text-neutral-900 dark:text-neutral-100">{{ __('Sécurité') }}</strong> - {{ __('Signature cryptographique pour vérifier l\'authenticité') }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Créer un webhook -->
+                <div class="p-6">
+                    <h3 class="text-base font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
+                        🚀 {{ __('Comment créer un webhook') }}
+                    </h3>
+                    <ol class="list-decimal list-inside space-y-3 text-sm text-neutral-600 dark:text-neutral-400">
+                        <li>
+                            <strong class="text-neutral-900 dark:text-neutral-100">{{ __('Accéder à la page de création') }}</strong>
+                            <p class="mt-1 ml-6">{{ __('Allez dans Admin → Webhooks → Créer un webhook') }}</p>
+                        </li>
+                        <li>
+                            <strong class="text-neutral-900 dark:text-neutral-100">{{ __('Remplir les informations') }}</strong>
+                            <p class="mt-1 ml-6">{{ __('Donnez un nom descriptif et entrez l\'URL HTTPS qui recevra les notifications') }}</p>
+                        </li>
+                        <li>
+                            <strong class="text-neutral-900 dark:text-neutral-100">{{ __('Sélectionner les événements') }}</strong>
+                            <p class="mt-1 ml-6">{{ __('Cochez les événements pour lesquels vous souhaitez recevoir des notifications (lead.created, lead.email_confirmed, etc.)') }}</p>
+                        </li>
+                        <li>
+                            <strong class="text-neutral-900 dark:text-neutral-100">{{ __('Association (optionnel)') }}</strong>
+                            <p class="mt-1 ml-6">{{ __('Spécifiez un formulaire ou un centre d\'appels pour filtrer les événements, ou laissez vide pour tous les événements') }}</p>
+                        </li>
+                        <li>
+                            <strong class="text-neutral-900 dark:text-neutral-100">{{ __('Activer et créer') }}</strong>
+                            <p class="mt-1 ml-6">{{ __('Activez le webhook et cliquez sur Créer. Un secret sera automatiquement généré pour sécuriser les requêtes.') }}</p>
+                        </li>
+                    </ol>
+                </div>
+
+                <!-- Événements disponibles -->
+                <div class="p-6">
+                    <h3 class="text-base font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
+                        📨 {{ __('Événements disponibles') }}
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                            <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('lead.created') }} - {{ __('Lead créé') }}</div>
+                            <p class="text-sm text-neutral-600 dark:text-neutral-400">{{ __('Déclenché quand un nouveau lead est créé dans le système.') }}</p>
+                        </div>
+                        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                            <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('lead.email_confirmed') }} - {{ __('Email confirmé') }}</div>
+                            <p class="text-sm text-neutral-600 dark:text-neutral-400">{{ __('Déclenché quand un lead confirme son adresse email via le lien de confirmation.') }}</p>
+                        </div>
+                        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                            <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('lead.assigned') }} - {{ __('Lead assigné') }}</div>
+                            <p class="text-sm text-neutral-600 dark:text-neutral-400">{{ __('Déclenché quand un lead est assigné à un agent.') }}</p>
+                        </div>
+                        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                            <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('lead.status_updated') }} - {{ __('Statut mis à jour') }}</div>
+                            <p class="text-sm text-neutral-600 dark:text-neutral-400">{{ __('Déclenché quand le statut d\'un lead change.') }}</p>
+                        </div>
+                        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                            <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('lead.converted') }} - {{ __('Lead converti') }}</div>
+                            <p class="text-sm text-neutral-600 dark:text-neutral-400">{{ __('Déclenché quand un lead est marqué comme converti.') }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Format des données -->
+                <div class="p-6">
+                    <h3 class="text-base font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
+                        📦 {{ __('Format des données') }}
+                    </h3>
+                    <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-3">
+                        {{ __('Toutes les requêtes webhook sont envoyées en POST avec un payload JSON signé :') }}
+                    </p>
+                    <pre class="overflow-x-auto rounded-lg bg-neutral-900 p-4 text-xs text-neutral-100 dark:bg-neutral-950"><code>{
+  "payload": {
+    "event": "lead.created",
+    "lead_id": 123,
+    "lead_email": "contact@example.com",
+    "lead_status": "pending_email",
+    "lead_data": {
+      "name": "Jean Dupont",
+      "phone": "+33 6 12 34 56 78"
+    },
+    "form_id": 5,
+    "call_center_id": 1,
+    "created_at": "2025-12-04T10:30:00+00:00"
+  },
+  "timestamp": 1701682200,
+  "signature": "abc123def456..."
+}</code></pre>
+                </div>
+
+                <!-- Sécurité -->
+                <div class="p-6">
+                    <h3 class="text-base font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
+                        🔐 {{ __('Sécurité et signature') }}
+                    </h3>
+                    <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-3">
+                        {{ __('Chaque requête webhook est signée avec un secret unique. Vous devez vérifier la signature pour garantir l\'authenticité de la requête.') }}
+                    </p>
+                    <div class="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
+                        <div class="font-semibold text-blue-900 dark:text-blue-100 mb-2">{{ __('Algorithme de signature') }}</div>
+                        <p class="text-sm text-blue-800 dark:text-blue-200">{{ __('La signature est calculée avec HMAC-SHA256 : signature = HMAC-SHA256(json_encode(payload) + timestamp, secret)') }}</p>
+                    </div>
+                    <p class="mt-3 text-sm text-neutral-600 dark:text-neutral-400">
+                        {{ __('Le secret est affiché dans la page d\'édition du webhook. Gardez ce secret confidentiel et ne le partagez jamais publiquement.') }}
+                    </p>
+                </div>
+
+                <!-- Tester un webhook -->
+                <div class="p-6">
+                    <h3 class="text-base font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
+                        🧪 {{ __('Tester un webhook') }}
+                    </h3>
+                    <div class="space-y-3 text-sm text-neutral-600 dark:text-neutral-400">
+                        <div>
+                            <strong class="text-neutral-900 dark:text-neutral-100">{{ __('Méthode 1 : Utiliser un service de test') }}</strong>
+                            <p class="mt-1">{{ __('Allez sur webhook.site ou RequestBin, copiez l\'URL unique générée, créez un webhook avec cette URL, puis déclenchez un événement pour voir la requête reçue.') }}</p>
+                        </div>
+                        <div>
+                            <strong class="text-neutral-900 dark:text-neutral-100">{{ __('Méthode 2 : Créer un endpoint de test local') }}</strong>
+                            <p class="mt-1">{{ __('Utilisez ngrok pour créer un tunnel vers votre serveur local et tester les webhooks en développement.') }}</p>
+                        </div>
+                        <div>
+                            <strong class="text-neutral-900 dark:text-neutral-100">{{ __('Méthode 3 : Utiliser le bouton Tester') }}</strong>
+                            <p class="mt-1">{{ __('Dans la liste des webhooks, utilisez le bouton "Tester" pour envoyer une requête de test immédiatement.') }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Résolution des problèmes -->
+                <div class="p-6">
+                    <h3 class="text-base font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
+                        🔧 {{ __('Résolution des problèmes') }}
+                    </h3>
+                    <div class="space-y-3 text-sm">
+                        <div class="flex items-start gap-3">
+                            <span class="text-red-500 dark:text-red-400">⚠️</span>
+                            <div>
+                                <strong class="text-neutral-900 dark:text-neutral-100">{{ __('Le webhook n\'est pas déclenché') }}</strong>
+                                <p class="text-neutral-600 dark:text-neutral-400 mt-1">{{ __('Vérifiez que le webhook est actif, que les événements sont bien sélectionnés, et que les filtres (formulaire/centre) sont corrects.') }}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="text-red-500 dark:text-red-400">⚠️</span>
+                            <div>
+                                <strong class="text-neutral-900 dark:text-neutral-100">{{ __('Erreur 404 ou URL inaccessible') }}</strong>
+                                <p class="text-neutral-600 dark:text-neutral-400 mt-1">{{ __('Vérifiez que l\'URL est correcte et accessible publiquement, testez avec curl, et vérifiez les pare-feu et restrictions réseau.') }}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="text-yellow-500 dark:text-yellow-400">⚠️</span>
+                            <div>
+                                <strong class="text-neutral-900 dark:text-neutral-100">{{ __('Timeout (délai d\'attente)') }}</strong>
+                                <p class="text-neutral-600 dark:text-neutral-400 mt-1">{{ __('Optimisez votre endpoint pour répondre rapidement (< 1 seconde). Répondez immédiatement avec un code 200, puis traitez les données de manière asynchrone.') }}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="text-red-500 dark:text-red-400">⚠️</span>
+                            <div>
+                                <strong class="text-neutral-900 dark:text-neutral-100">{{ __('Erreur 401 (Signature invalide)') }}</strong>
+                                <p class="text-neutral-600 dark:text-neutral-400 mt-1">{{ __('Vérifiez que vous utilisez le bon secret, que vous calculez la signature correctement avec HMAC-SHA256, et que vous utilisez json_encode(payload) + timestamp dans cet ordre.') }}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="text-blue-500 dark:text-blue-400">⚠️</span>
+                            <div>
+                                <strong class="text-neutral-900 dark:text-neutral-100">{{ __('Webhook déclenché plusieurs fois') }}</strong>
+                                <p class="text-neutral-600 dark:text-neutral-400 mt-1">{{ __('C\'est normal si votre serveur répond avec un code d\'erreur. Le système fait jusqu\'à 3 tentatives. Répondez toujours avec un code 200 si vous recevez le webhook, et traitez les doublons dans votre code.') }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FAQ -->
+                <div class="p-6">
+                    <h3 class="text-base font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
+                        ❓ {{ __('Questions fréquentes') }}
+                    </h3>
+                    <div class="space-y-4">
+                        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                            <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('Puis-je créer plusieurs webhooks pour le même événement ?') }}</div>
+                            <p class="text-sm text-neutral-600 dark:text-neutral-400">{{ __('Oui, vous pouvez créer autant de webhooks que nécessaire. Chaque webhook recevra les notifications indépendamment.') }}</p>
+                        </div>
+                        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                            <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('Que se passe-t-il si mon serveur est en panne ?') }}</div>
+                            <p class="text-sm text-neutral-600 dark:text-neutral-400">{{ __('Le système fait jusqu\'à 3 tentatives avec un délai exponentiel. Si toutes les tentatives échouent, l\'événement est loggé mais pas renvoyé.') }}</p>
+                        </div>
+                        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                            <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('Les webhooks sont-ils envoyés en temps réel ?') }}</div>
+                            <p class="text-sm text-neutral-600 dark:text-neutral-400">{{ __('Oui, les webhooks sont envoyés immédiatement après l\'événement, via une queue Laravel pour ne pas bloquer l\'application.') }}</p>
+                        </div>
+                        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                            <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('Comment désactiver temporairement un webhook ?') }}</div>
+                            <p class="text-sm text-neutral-600 dark:text-neutral-400">{{ __('Allez dans la page d\'édition du webhook et décochez "Activer ce webhook". Vous pouvez le réactiver à tout moment.') }}</p>
+                        </div>
+                        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                            <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('Que dois-je répondre à la requête webhook ?') }}</div>
+                            <p class="text-sm text-neutral-600 dark:text-neutral-400">{{ __('Répondez avec un code HTTP 200 (OK) pour indiquer que vous avez bien reçu et traité le webhook. Tout autre code déclenchera un retry.') }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 
     <!-- Filtres -->
     <div class="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-800 sm:flex-row">

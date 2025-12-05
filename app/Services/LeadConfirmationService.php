@@ -37,7 +37,15 @@ class LeadConfirmationService
         // Generate confirmation token if not exists
         if (! $lead->email_confirmation_token) {
             $lead->email_confirmation_token = Str::random(64);
+        }
+
+        // Always set expiration if not set or expired
+        if (! $lead->email_confirmation_token_expires_at || $lead->email_confirmation_token_expires_at->isPast()) {
             $lead->email_confirmation_token_expires_at = now()->addHours(24);
+        }
+
+        // Save if token or expiration was updated
+        if ($lead->isDirty(['email_confirmation_token', 'email_confirmation_token_expires_at'])) {
             $lead->save();
         }
 
@@ -112,8 +120,10 @@ class LeadConfirmationService
 
     /**
      * Configure mailer with SMTP profile settings.
+     *
+     * @return \Illuminate\Mail\Mailer|\Illuminate\Support\Testing\Fakes\MailFake
      */
-    protected function configureMailer(SmtpProfile $smtpProfile): Mailer
+    protected function configureMailer(SmtpProfile $smtpProfile)
     {
         $config = [
             'transport' => 'smtp',

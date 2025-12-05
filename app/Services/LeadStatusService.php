@@ -41,24 +41,29 @@ class LeadStatusService
      */
     public function getAllStatusesWithCount(?CallCenter $callCenter = null): Collection
     {
-        $query = LeadStatus::withCount('leads')
-            ->orderBy('order')
-            ->orderBy('name');
+        $query = LeadStatus::query();
 
         if ($callCenter) {
-            $query->whereHas('leads', function ($q) use ($callCenter) {
+            $query->withCount(['leads' => function ($q) use ($callCenter) {
                 $q->where('call_center_id', $callCenter->id);
-            });
+            }])
+                ->whereHas('leads', function ($q) use ($callCenter) {
+                    $q->where('call_center_id', $callCenter->id);
+                });
+        } else {
+            $query->withCount('leads');
         }
 
-        return $query->get();
+        return $query->orderBy('order')
+            ->orderBy('name')
+            ->get();
     }
 
     /**
      * Delete a status (only if not system).
      * If the status is used by leads, you can provide a replacement status.
-     * 
-     * @param \App\Models\CallCenter|null $callCenter If provided, only check/update leads from this call center
+     *
+     * @param  \App\Models\CallCenter|null  $callCenter  If provided, only check/update leads from this call center
      */
     public function deleteStatus(LeadStatus $status, ?LeadStatus $replacementStatus = null, ?\App\Models\CallCenter $callCenter = null): bool
     {
@@ -80,9 +85,9 @@ class LeadStatusService
             if (! $replacementStatus) {
                 $message = __('Ce statut est utilisé sur :count lead(s)', ['count' => $leadsCount]);
                 if ($callCenter && $globalLeadsCount > $leadsCount) {
-                    $message .= ' ' . __('dans votre centre d\'appels');
+                    $message .= ' '.__('dans votre centre d\'appels');
                 }
-                $message .= '. ' . __('Veuillez sélectionner un statut de remplacement.');
+                $message .= '. '.__('Veuillez sélectionner un statut de remplacement.');
                 throw new \Exception($message);
             }
 
@@ -98,7 +103,7 @@ class LeadStatusService
 
             // After replacement, check if status is still used globally
             $remainingLeadsCount = $status->leads()->count();
-            
+
             // If status is no longer used anywhere, delete it
             if ($remainingLeadsCount === 0) {
                 return $status->delete();

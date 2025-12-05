@@ -142,6 +142,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('owner.statuses.create');
         Volt::route('owner/statuses/{status}/edit', 'owner.statuses.edit')
             ->name('owner.statuses.edit');
+
+        // Gestion des Webhooks (Call Center Owners)
+        Volt::route('owner/webhooks', 'owner.webhooks')
+            ->name('owner.webhooks');
+        Volt::route('owner/webhooks/create', 'owner.webhooks.create')
+            ->name('owner.webhooks.create');
     });
 
     // Sprint 2: Gestion des formulaires et profils SMTP (Super Admin uniquement)

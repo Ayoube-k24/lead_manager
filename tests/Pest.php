@@ -7,36 +7,12 @@
 |
 | The closure you provide to your test functions is always bound to a specific PHPUnit test
 | case class. By default, that class is "PHPUnit\Framework\TestCase". Of course, you may
-| need to change it using the "pest()" function to bind a different classes or traits.
+| need to change it using the "uses()" function to bind a different classes or traits.
 |
 */
 
-pest()->extend(Tests\TestCase::class)
-    ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
-    ->in('Feature');
-
-pest()->extend(Tests\TestCase::class)
-    ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
-    ->in('Unit');
-
-// Disable model events during migrations for Unit tests to prevent recursion
-beforeEach(function () {
-    // Disable model events before migrations run
-    \Illuminate\Database\Eloquent\Model::unsetEventDispatcher();
-})->in('Unit');
-
-// Re-enable model events after migrations
-afterEach(function () {
-    // Re-enable model events after migrations
-    \Illuminate\Database\Eloquent\Model::setEventDispatcher($this->app['events']);
-})->in('Unit');
-
-// Ensure migrations run correctly in all Feature tests
-beforeEach(function () {
-    // Only run for Feature tests (already filtered by ->in('Feature'))
-    require_once __DIR__.'/Feature/Sprint1/EnsureMigrationsRun.php';
-    ensureMigrationsRun();
-})->in('Feature');
+uses(Tests\TestCase::class)->in('Feature');
+uses(Tests\TestCase::class)->in('Unit');
 
 /*
 |--------------------------------------------------------------------------
@@ -60,11 +36,6 @@ expect()->extend('toBeOne', function () {
 |
 | While Pest is very powerful out-of-the-box, you may have some testing code specific to your
 | project that you don't want to repeat in every file. Here you can also expose helpers as
-| global functions to help you to reduce the number of lines of code in your test files.
+| global functions to help you to reduce the amount of code you need to write.
 |
 */
-
-function something()
-{
-    // ..
-}

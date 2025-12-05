@@ -86,21 +86,21 @@ class SetupTestUsers extends Command
             return;
         }
 
-        $columns = DB::select('SHOW COLUMNS FROM roles');
-        $columnNames = array_column($columns, 'Field');
-
-        if (! in_array('name', $columnNames)) {
-            DB::statement('ALTER TABLE roles ADD COLUMN name VARCHAR(255) UNIQUE AFTER id');
+        if (! Schema::hasColumn('roles', 'name')) {
+            $sql = $this->getAddColumnSql('roles', 'name', 'VARCHAR(255)');
+            DB::statement($sql);
             $this->line("  ✓ Colonne 'name' ajoutée");
         }
 
-        if (! in_array('slug', $columnNames)) {
-            DB::statement('ALTER TABLE roles ADD COLUMN slug VARCHAR(255) UNIQUE AFTER name');
+        if (! Schema::hasColumn('roles', 'slug')) {
+            $sql = $this->getAddColumnSql('roles', 'slug', 'VARCHAR(255)');
+            DB::statement($sql);
             $this->line("  ✓ Colonne 'slug' ajoutée");
         }
 
-        if (! in_array('description', $columnNames)) {
-            DB::statement('ALTER TABLE roles ADD COLUMN description TEXT NULL AFTER slug');
+        if (! Schema::hasColumn('roles', 'description')) {
+            $sql = $this->getAddColumnSql('roles', 'description', 'TEXT NULL');
+            DB::statement($sql);
             $this->line("  ✓ Colonne 'description' ajoutée");
         }
     }
@@ -111,16 +111,15 @@ class SetupTestUsers extends Command
             return;
         }
 
-        $columns = DB::select('SHOW COLUMNS FROM users');
-        $columnNames = array_column($columns, 'Field');
-
-        if (! in_array('role_id', $columnNames)) {
-            DB::statement('ALTER TABLE users ADD COLUMN role_id BIGINT UNSIGNED NULL AFTER id');
+        if (! Schema::hasColumn('users', 'role_id')) {
+            $sql = $this->getAddColumnSql('users', 'role_id', 'BIGINT UNSIGNED NULL');
+            DB::statement($sql);
             $this->line("  ✓ Colonne 'role_id' ajoutée");
         }
 
-        if (! in_array('call_center_id', $columnNames)) {
-            DB::statement('ALTER TABLE users ADD COLUMN call_center_id BIGINT UNSIGNED NULL AFTER role_id');
+        if (! Schema::hasColumn('users', 'call_center_id')) {
+            $sql = $this->getAddColumnSql('users', 'call_center_id', 'BIGINT UNSIGNED NULL');
+            DB::statement($sql);
             $this->line("  ✓ Colonne 'call_center_id' ajoutée");
         }
     }
@@ -131,23 +130,42 @@ class SetupTestUsers extends Command
             return;
         }
 
-        $columns = DB::select('SHOW COLUMNS FROM call_centers');
-        $columnNames = array_column($columns, 'Field');
-
         $requiredColumns = [
-            'name' => 'VARCHAR(255) AFTER id',
-            'description' => 'TEXT NULL AFTER name',
-            'owner_id' => 'BIGINT UNSIGNED NOT NULL AFTER description',
-            'distribution_method' => "VARCHAR(255) DEFAULT 'round_robin' AFTER owner_id",
-            'is_active' => 'BOOLEAN DEFAULT 1 AFTER distribution_method',
+            'name' => 'VARCHAR(255)',
+            'description' => 'TEXT NULL',
+            'owner_id' => 'BIGINT UNSIGNED NOT NULL',
+            'distribution_method' => "VARCHAR(255) DEFAULT 'round_robin'",
+            'is_active' => 'BOOLEAN DEFAULT 1',
         ];
 
         foreach ($requiredColumns as $column => $definition) {
-            if (! in_array($column, $columnNames)) {
-                DB::statement("ALTER TABLE call_centers ADD COLUMN {$column} {$definition}");
+            if (! Schema::hasColumn('call_centers', $column)) {
+                $sql = $this->getAddColumnSql('call_centers', $column, $definition);
+                DB::statement($sql);
                 $this->line("  ✓ Colonne '{$column}' ajoutée");
             }
         }
+    }
+
+    /**
+     * Get SQL for adding a column, compatible with both MySQL and SQLite.
+     */
+    private function getAddColumnSql(string $table, string $column, string $definition): string
+    {
+        $driver = config('database.default');
+        $connection = config("database.connections.{$driver}.driver");
+
+        if ($connection === 'sqlite') {
+            // SQLite doesn't support AFTER clause, and has different syntax
+            $definition = str_replace(['BIGINT UNSIGNED', 'VARCHAR(255)', 'BOOLEAN'], ['INTEGER', 'TEXT', 'INTEGER'], $definition);
+            $definition = str_replace('DEFAULT 1', 'DEFAULT 1', $definition);
+            $definition = preg_replace('/\s+AFTER\s+\w+/i', '', $definition);
+
+            return "ALTER TABLE {$table} ADD COLUMN {$column} {$definition}";
+        }
+
+        // MySQL syntax
+        return "ALTER TABLE {$table} ADD COLUMN {$column} {$definition}";
     }
 
     private function createRoles(): array

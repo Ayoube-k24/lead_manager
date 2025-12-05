@@ -1,0 +1,14 @@
+@echo off
+echo ==========================================
+echo Lancement des tests unitaires
+echo ==========================================
+echo.
+
+php artisan test --colors=always
+
+echo.
+echo ==========================================
+echo Tests termines
+echo ==========================================
+pause
+

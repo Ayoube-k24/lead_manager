@@ -106,6 +106,13 @@ new class extends Component {
         <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">{{ __('Mettez à jour la configuration de ce webhook') }}</p>
     </div>
 
+    <!-- Guide rapide -->
+    <div class="rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
+        <p class="text-sm text-blue-900 dark:text-blue-100">
+            💡 {{ __('Un guide complet est disponible dans le fichier GUIDE_WEBHOOKS.md à la racine du projet. Il contient des exemples de code, la résolution des problèmes et les bonnes pratiques.') }}
+        </p>
+    </div>
+
     <!-- Formulaire -->
     <form wire:submit="update" class="flex flex-col gap-6">
         <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
@@ -134,8 +141,7 @@ new class extends Component {
                             type="button"
                             variant="ghost" 
                             size="sm"
-                            wire:click="$dispatch('copy-secret', { secret: '{{ $webhook->secret }}' })"
-                            onclick="navigator.clipboard.writeText('{{ $webhook->secret }}'); alert('{{ __('Secret copié !') }}');"
+                            onclick="copySecret('{{ $webhook->secret }}')"
                         >
                             {{ __('Copier') }}
                         </flux:button>
@@ -219,3 +225,42 @@ new class extends Component {
         </div>
     </form>
 </div>
+
+<script>
+function copySecret(secret) {
+    navigator.clipboard.writeText(secret).then(() => {
+        showCopyNotification('Secret copié dans le presse-papiers !');
+    }).catch(() => {
+        showCopyNotification('Erreur lors de la copie', 'error');
+    });
+}
+
+function showCopyNotification(message, type = 'success') {
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 z-50 rounded-lg px-4 py-3 shadow-lg transition-all duration-300 ${
+        type === 'success' 
+            ? 'bg-green-500 text-white' 
+            : 'bg-red-500 text-white'
+    }`;
+    notification.style.opacity = '0';
+    notification.style.transform = 'translateY(-20px)';
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.style.opacity = '1';
+        notification.style.transform = 'translateY(0)';
+    }, 10);
+    
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        notification.style.transform = 'translateY(-20px)';
+        setTimeout(() => {
+            if (document.body.contains(notification)) {
+                document.body.removeChild(notification);
+            }
+        }, 300);
+    }, 3000);
+}
+</script>

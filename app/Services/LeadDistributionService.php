@@ -24,6 +24,7 @@ class LeadDistributionService
             'lead_call_center_id' => $lead->call_center_id,
             'lead_status' => $lead->status,
             'lead_assigned_to' => $lead->assigned_to,
+            'call_center_provided' => $callCenter !== null,
         ]);
 
         // If call center is not provided, try to get it from the lead
@@ -57,6 +58,7 @@ class LeadDistributionService
             }
         } else {
             // If call center is provided, refresh it to ensure we have latest data
+            // But don't refresh the lead to avoid losing the current status
             $callCenter->refresh();
         }
 
@@ -160,14 +162,18 @@ class LeadDistributionService
             ->get()
             ->keyBy('assigned_to');
 
-        $minCount = $agentCounts->min('lead_count') ?? 0;
+        // Calculate minimum count including agents with 0 leads
+        $allCounts = $agents->map(function ($agent) use ($agentCounts) {
+            return $agentCounts->get($agent->id)?->lead_count ?? 0;
+        });
+        $minCount = $allCounts->min();
 
         // Get agents with minimum count
         $availableAgents = $agents->filter(function ($agent) use ($agentCounts, $minCount) {
             $count = $agentCounts->get($agent->id)?->lead_count ?? 0;
 
             return $count === $minCount;
-        });
+        })->values();
 
         // If multiple agents have the same count, pick the one with the oldest last assignment
         if ($availableAgents->count() > 1) {
@@ -184,10 +190,11 @@ class LeadDistributionService
                 $lastAssigned = $lastAssignments->get($agent->id)?->last_assigned ?? '1970-01-01';
 
                 return $lastAssigned.'_'.$agent->id;
-            })->first();
+            })->values()->first();
         }
 
-        return $availableAgents->first();
+        // Sort by ID for deterministic selection when only one agent has minimum count
+        return $availableAgents->sortBy('id')->first();
     }
 
     /**
@@ -286,6 +293,9 @@ class LeadDistributionService
                 'agent_call_center_id' => $agent->call_center_id,
             ]);
 
+            // Ensure lead is not modified
+            $lead->refresh();
+
             return false;
         }
 
@@ -297,6 +307,9 @@ class LeadDistributionService
                 'user_role' => $agent->role?->slug,
                 'is_active' => $agent->is_active,
             ]);
+
+            // Ensure lead is not modified
+            $lead->refresh();
 
             return false;
         }

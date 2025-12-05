@@ -113,7 +113,7 @@ class Lead extends Model
      */
     public function leadStatus(): BelongsTo
     {
-        return $this->belongsTo(LeadStatus::class, 'status_id');
+        return $this->belongsTo(\App\Models\LeadStatus::class, 'status_id');
     }
 
     /**
@@ -199,45 +199,44 @@ class Lead extends Model
      */
     public function setStatus(LeadStatus|string|\App\Models\LeadStatus $status): void
     {
+        $statusSlug = null;
+        
         // If it's a LeadStatus model, use it directly
         if ($status instanceof \App\Models\LeadStatus) {
             $this->status_id = $status->id;
-            $this->attributes['status'] = $status->slug; // Keep for backward compatibility
-            return;
-        }
-
-        // If it's an enum, find the corresponding model
-        if ($status instanceof LeadStatus) {
+            $statusSlug = $status->slug;
+        } elseif ($status instanceof LeadStatus) {
+            // If it's an enum, find the corresponding model
             $statusModel = \App\Models\LeadStatus::where('slug', $status->value)->first();
             if ($statusModel) {
                 $this->status_id = $statusModel->id;
-                $this->attributes['status'] = $status->value;
-                return;
+                $statusSlug = $status->value;
             }
-        }
-
-        // If it's a string, try to find by slug
-        if (is_string($status)) {
+        } elseif (is_string($status)) {
+            // If it's a string, try to find by slug
             $statusModel = \App\Models\LeadStatus::where('slug', $status)->first();
             if ($statusModel) {
                 $this->status_id = $statusModel->id;
-                $this->attributes['status'] = $status;
-                return;
-            }
-
-            // Fallback: try enum
-            $statusEnum = LeadStatus::tryFrom($status);
-            if ($statusEnum) {
-                $statusModel = \App\Models\LeadStatus::where('slug', $statusEnum->value)->first();
-                if ($statusModel) {
-                    $this->status_id = $statusModel->id;
-                    $this->attributes['status'] = $statusEnum->value;
-                    return;
+                $statusSlug = $status;
+            } else {
+                // Fallback: try enum
+                $statusEnum = LeadStatus::tryFrom($status);
+                if ($statusEnum) {
+                    $statusModel = \App\Models\LeadStatus::where('slug', $statusEnum->value)->first();
+                    if ($statusModel) {
+                        $this->status_id = $statusModel->id;
+                        $statusSlug = $statusEnum->value;
+                    }
+                } else {
+                    // Last resort: just set the string
+                    $statusSlug = $status;
                 }
             }
-
-            // Last resort: just set the string
-            $this->attributes['status'] = $status;
+        }
+        
+        // Set status using property assignment to ensure Eloquent detects the change
+        if ($statusSlug !== null) {
+            $this->status = $statusSlug;
         }
     }
 
@@ -276,12 +275,14 @@ class Lead extends Model
     {
         $this->email_confirmed_at = now();
         
-        // Try to get status from model, fallback to enum
+        // Set status to email_confirmed - this will trigger the observer
+        // Try to get status from model first, fallback to string
         $status = \App\Models\LeadStatus::getBySlug('email_confirmed');
         if ($status) {
             $this->setStatus($status);
         } else {
-            $this->setStatus(LeadStatus::EmailConfirmed);
+            // Fallback: set status directly as string if model not found
+            $this->status = 'email_confirmed';
         }
         
         // Use save() to trigger Observer
@@ -293,6 +294,7 @@ class Lead extends Model
         \Log::info('Lead email confirmed via confirmEmail()', [
             'lead_id' => $this->id,
             'status' => $this->status,
+            'status_id' => $this->status_id,
             'call_center_id' => $this->call_center_id,
             'assigned_to' => $this->assigned_to,
         ]);

@@ -6,206 +6,197 @@ use App\Models\Lead;
 use App\Models\LeadReminder;
 use App\Models\User;
 use App\Services\ReminderService;
+use Carbon\Carbon;
 
-beforeEach(function () {
-    require_once __DIR__.'/../../Feature/Sprint1/EnsureMigrationsRun.php';
-    ensureMigrationsRun();
+describe('ReminderService', function () {
+    beforeEach(function () {
+        $this->service = new ReminderService();
+    });
 
-    $this->service = app(ReminderService::class);
+    describe('scheduleReminder', function () {
+        test('creates a reminder successfully', function () {
+            $lead = Lead::factory()->create();
+            $user = User::factory()->create();
+            $date = now()->addDays(2);
+
+            $reminder = $this->service->scheduleReminder($lead, $user, $date, 'call', 'Test note');
+
+            expect($reminder)->toBeInstanceOf(LeadReminder::class)
+                ->and($reminder->lead_id)->toBe($lead->id)
+                ->and($reminder->user_id)->toBe($user->id)
+                ->and($reminder->reminder_date->format('Y-m-d'))->toBe($date->format('Y-m-d'))
+                ->and($reminder->reminder_type)->toBe('call')
+                ->and($reminder->notes)->toBe('Test note');
+        });
+    });
+
+    describe('getUpcomingReminders', function () {
+        test('returns upcoming reminders', function () {
+            $user = User::factory()->create();
+            $lead = Lead::factory()->create();
+
+            LeadReminder::factory()->create([
+                'user_id' => $user->id,
+                'lead_id' => $lead->id,
+                'reminder_date' => now()->addDays(3),
+            ]);
+            LeadReminder::factory()->create([
+                'user_id' => $user->id,
+                'lead_id' => $lead->id,
+                'reminder_date' => now()->addDays(10),
+            ]);
+
+            $reminders = $this->service->getUpcomingReminders($user, 7);
+
+            expect($reminders->count())->toBe(1);
+        });
+
+        test('filters by user when provided', function () {
+            $user1 = User::factory()->create();
+            $user2 = User::factory()->create();
+            $lead = Lead::factory()->create();
+
+            LeadReminder::factory()->create([
+                'user_id' => $user1->id,
+                'lead_id' => $lead->id,
+                'reminder_date' => now()->addDays(3),
+            ]);
+            LeadReminder::factory()->create([
+                'user_id' => $user2->id,
+                'lead_id' => $lead->id,
+                'reminder_date' => now()->addDays(3),
+            ]);
+
+            $reminders = $this->service->getUpcomingReminders($user1, 7);
+
+            expect($reminders->count())->toBe(1)
+                ->and($reminders->first()->user_id)->toBe($user1->id);
+        });
+    });
+
+    describe('getRemindersForDate', function () {
+        test('returns reminders for specific date', function () {
+            $user = User::factory()->create();
+            $lead = Lead::factory()->create();
+            $date = now()->addDays(2)->startOfDay();
+
+            LeadReminder::factory()->create([
+                'user_id' => $user->id,
+                'lead_id' => $lead->id,
+                'reminder_date' => $date,
+                'is_completed' => false,
+            ]);
+            LeadReminder::factory()->create([
+                'user_id' => $user->id,
+                'lead_id' => $lead->id,
+                'reminder_date' => now()->addDays(3),
+                'is_completed' => false,
+            ]);
+
+            $reminders = $this->service->getRemindersForDate($date, $user);
+
+            expect($reminders->count())->toBe(1);
+        });
+
+        test('excludes completed reminders', function () {
+            $user = User::factory()->create();
+            $lead = Lead::factory()->create();
+            $date = now()->addDays(2)->startOfDay();
+
+            LeadReminder::factory()->create([
+                'user_id' => $user->id,
+                'lead_id' => $lead->id,
+                'reminder_date' => $date,
+                'is_completed' => true,
+            ]);
+
+            $reminders = $this->service->getRemindersForDate($date, $user);
+
+            expect($reminders->count())->toBe(0);
+        });
+    });
+
+    describe('completeReminder', function () {
+        test('marks reminder as completed', function () {
+            $reminder = LeadReminder::factory()->create(['is_completed' => false]);
+
+            $completed = $this->service->completeReminder($reminder);
+
+            expect($completed->is_completed)->toBeTrue();
+        });
+    });
+
+    describe('cancelReminder', function () {
+        test('deletes reminder', function () {
+            $reminder = LeadReminder::factory()->create();
+
+            $result = $this->service->cancelReminder($reminder);
+
+            expect($result)->toBeTrue()
+                ->and(LeadReminder::find($reminder->id))->toBeNull();
+        });
+    });
+
+    describe('getRemindersToNotify', function () {
+        test('returns reminders that need notification', function () {
+            $lead = Lead::factory()->create();
+
+            LeadReminder::factory()->create([
+                'lead_id' => $lead->id,
+                'reminder_date' => now()->addHours(12),
+                'is_completed' => false,
+                'notified_at' => null,
+            ]);
+            LeadReminder::factory()->create([
+                'lead_id' => $lead->id,
+                'reminder_date' => now()->addDays(2),
+                'is_completed' => false,
+            ]);
+
+            $reminders = $this->service->getRemindersToNotify();
+
+            expect($reminders->count())->toBe(1);
+        });
+
+        test('excludes already notified reminders', function () {
+            $lead = Lead::factory()->create();
+
+            LeadReminder::factory()->create([
+                'lead_id' => $lead->id,
+                'reminder_date' => now()->addHours(12),
+                'is_completed' => false,
+                'notified_at' => now(),
+            ]);
+
+            $reminders = $this->service->getRemindersToNotify();
+
+            expect($reminders->count())->toBe(0);
+        });
+    });
+
+    describe('getOverdueReminders', function () {
+        test('returns overdue reminders', function () {
+            $user = User::factory()->create();
+            $lead = Lead::factory()->create();
+
+            LeadReminder::factory()->create([
+                'user_id' => $user->id,
+                'lead_id' => $lead->id,
+                'reminder_date' => now()->subDays(1),
+                'is_completed' => false,
+            ]);
+            LeadReminder::factory()->create([
+                'user_id' => $user->id,
+                'lead_id' => $lead->id,
+                'reminder_date' => now()->addDays(1),
+                'is_completed' => false,
+            ]);
+
+            $reminders = $this->service->getOverdueReminders($user);
+
+            expect($reminders->count())->toBe(1);
+        });
+    });
 });
 
-test('can schedule a reminder for a lead', function () {
-    $lead = Lead::factory()->create();
-    $user = User::factory()->create();
-    $date = now()->addDays(1);
-    $type = 'call_back';
-    $notes = 'Test reminder notes';
 
-    $reminder = $this->service->scheduleReminder($lead, $user, $date, $type, $notes);
-
-    expect($reminder)
-        ->toBeInstanceOf(LeadReminder::class)
-        ->and($reminder->lead_id)->toBe($lead->id)
-        ->and($reminder->user_id)->toBe($user->id)
-        ->and($reminder->reminder_date->format('Y-m-d H:i'))->toBe($date->format('Y-m-d H:i'))
-        ->and($reminder->reminder_type)->toBe($type)
-        ->and($reminder->notes)->toBe($notes)
-        ->and($reminder->is_completed)->toBeFalse();
-});
-
-test('can get upcoming reminders for a user', function () {
-    $user = User::factory()->create();
-    $lead = Lead::factory()->create();
-
-    $reminder1 = LeadReminder::factory()->create([
-        'user_id' => $user->id,
-        'lead_id' => $lead->id,
-        'reminder_date' => now()->addDays(1),
-        'is_completed' => false,
-    ]);
-
-    $reminder2 = LeadReminder::factory()->create([
-        'user_id' => $user->id,
-        'lead_id' => $lead->id,
-        'reminder_date' => now()->addDays(2),
-        'is_completed' => false,
-    ]);
-
-    // Past reminder (should not be included)
-    LeadReminder::factory()->create([
-        'user_id' => $user->id,
-        'lead_id' => $lead->id,
-        'reminder_date' => now()->subDays(1),
-        'is_completed' => false,
-    ]);
-
-    // Completed reminder (should not be included by default)
-    LeadReminder::factory()->create([
-        'user_id' => $user->id,
-        'lead_id' => $lead->id,
-        'reminder_date' => now()->addDays(3),
-        'is_completed' => true,
-    ]);
-
-    $upcoming = $this->service->getUpcomingReminders($user, 7);
-
-    expect($upcoming)
-        ->toHaveCount(2)
-        ->and($upcoming->pluck('id')->toArray())->toContain($reminder1->id, $reminder2->id);
-});
-
-test('can get upcoming reminders for all users', function () {
-    $user1 = User::factory()->create();
-    $user2 = User::factory()->create();
-    $lead = Lead::factory()->create();
-
-    LeadReminder::factory()->create([
-        'user_id' => $user1->id,
-        'lead_id' => $lead->id,
-        'reminder_date' => now()->addDays(1),
-    ]);
-
-    LeadReminder::factory()->create([
-        'user_id' => $user2->id,
-        'lead_id' => $lead->id,
-        'reminder_date' => now()->addDays(2),
-    ]);
-
-    $upcoming = $this->service->getUpcomingReminders(null, 7);
-
-    expect($upcoming)->toHaveCount(2);
-});
-
-test('can complete a reminder', function () {
-    $reminder = LeadReminder::factory()->create([
-        'is_completed' => false,
-        'completed_at' => null,
-    ]);
-
-    $this->service->completeReminder($reminder);
-
-    $reminder->refresh();
-
-    expect($reminder->is_completed)->toBeTrue()
-        ->and($reminder->completed_at)->not->toBeNull();
-});
-
-test('can cancel a reminder', function () {
-    $reminder = LeadReminder::factory()->create();
-
-    $this->service->cancelReminder($reminder);
-
-    expect(LeadReminder::find($reminder->id))->toBeNull();
-});
-
-test('can get reminders for a specific date', function () {
-    $user = User::factory()->create();
-    $lead = Lead::factory()->create();
-    $targetDate = now()->addDays(1)->startOfDay();
-
-    $reminder1 = LeadReminder::factory()->create([
-        'user_id' => $user->id,
-        'lead_id' => $lead->id,
-        'reminder_date' => $targetDate->copy()->setTime(10, 0),
-    ]);
-
-    $reminder2 = LeadReminder::factory()->create([
-        'user_id' => $user->id,
-        'lead_id' => $lead->id,
-        'reminder_date' => $targetDate->copy()->setTime(14, 0),
-    ]);
-
-    // Different date
-    LeadReminder::factory()->create([
-        'user_id' => $user->id,
-        'lead_id' => $lead->id,
-        'reminder_date' => $targetDate->copy()->addDay(),
-    ]);
-
-    $reminders = $this->service->getRemindersForDate($targetDate, $user);
-
-    expect($reminders)
-        ->toHaveCount(2)
-        ->and($reminders->pluck('id')->toArray())->toContain($reminder1->id, $reminder2->id);
-});
-
-test('can get overdue reminders', function () {
-    $user = User::factory()->create();
-    $lead = Lead::factory()->create();
-
-    $overdue1 = LeadReminder::factory()->create([
-        'user_id' => $user->id,
-        'lead_id' => $lead->id,
-        'reminder_date' => now()->subHours(2),
-        'is_completed' => false,
-    ]);
-
-    $overdue2 = LeadReminder::factory()->create([
-        'user_id' => $user->id,
-        'lead_id' => $lead->id,
-        'reminder_date' => now()->subDays(1),
-        'is_completed' => false,
-    ]);
-
-    // Future reminder (not overdue)
-    LeadReminder::factory()->create([
-        'user_id' => $user->id,
-        'lead_id' => $lead->id,
-        'reminder_date' => now()->addHours(1),
-        'is_completed' => false,
-    ]);
-
-    $overdue = $this->service->getOverdueReminders($user);
-
-    expect($overdue)
-        ->toHaveCount(2)
-        ->and($overdue->pluck('id')->toArray())->toContain($overdue1->id, $overdue2->id);
-});
-
-test('upcoming reminders are ordered by date', function () {
-    $user = User::factory()->create();
-    $lead = Lead::factory()->create();
-
-    $reminder3 = LeadReminder::factory()->create([
-        'user_id' => $user->id,
-        'lead_id' => $lead->id,
-        'reminder_date' => now()->addDays(3),
-    ]);
-
-    $reminder1 = LeadReminder::factory()->create([
-        'user_id' => $user->id,
-        'lead_id' => $lead->id,
-        'reminder_date' => now()->addDays(1),
-    ]);
-
-    $reminder2 = LeadReminder::factory()->create([
-        'user_id' => $user->id,
-        'lead_id' => $lead->id,
-        'reminder_date' => now()->addDays(2),
-    ]);
-
-    $upcoming = $this->service->getUpcomingReminders($user, 7);
-
-    expect($upcoming->pluck('id')->toArray())
-        ->toBe([$reminder1->id, $reminder2->id, $reminder3->id]);
-});

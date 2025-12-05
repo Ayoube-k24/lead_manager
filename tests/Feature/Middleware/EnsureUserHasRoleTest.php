@@ -2,113 +2,77 @@
 
 declare(strict_types=1);
 
+use App\Models\Role;
 use App\Models\User;
-use Database\Seeders\RoleSeeder;
-use Database\Seeders\UserSeeder;
+use Illuminate\Support\Facades\Route;
 
-beforeEach(function () {
-    $this->seed([RoleSeeder::class, UserSeeder::class]);
-});
+describe('EnsureUserHasRole Middleware', function () {
+    beforeEach(function () {
+        Route::middleware('role:super_admin')->get('/test-route', function () {
+            return response()->json(['message' => 'Success']);
+        });
+    });
 
-test('super admin can access admin dashboard', function () {
-    $user = User::where('email', 'admin@leadmanager.com')->first();
+    test('allows access when user has required role', function () {
+        $role = Role::firstOrCreate(['slug' => 'super_admin'], ['name' => 'Super Admin']);
+        $user = User::factory()->create(['role_id' => $role->id]);
 
-    $response = $this->actingAs($user)->get('/admin/dashboard');
+        $response = $this->actingAs($user)->get('/test-route');
 
-    $response->assertSuccessful();
-});
+        $response->assertSuccessful()
+            ->assertJson(['message' => 'Success']);
+    });
 
-test('call center owner can access owner dashboard', function () {
-    $user = User::where('email', 'owner@leadmanager.com')->first();
+    test('denies access when user does not have required role', function () {
+        $role = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
+        $user = User::factory()->create(['role_id' => $role->id]);
 
-    $response = $this->actingAs($user)->get('/owner/dashboard');
+        $response = $this->actingAs($user)->get('/test-route');
 
-    $response->assertSuccessful();
-});
+        $response->assertForbidden();
+    });
 
-test('agent can access agent dashboard', function () {
-    $user = User::where('email', 'agent1@leadmanager.com')->first();
+    test('redirects unauthenticated users to login', function () {
+        $response = $this->get('/test-route');
 
-    $response = $this->actingAs($user)->get('/agent/dashboard');
+        $response->assertRedirect(route('login'));
+    });
 
-    $response->assertSuccessful();
-});
+    test('returns JSON response for unauthenticated API requests', function () {
+        $response = $this->getJson('/test-route');
 
-test('super admin cannot access owner dashboard', function () {
-    $user = User::where('email', 'admin@leadmanager.com')->first();
+        $response->assertStatus(401)
+            ->assertJson(['message' => 'Unauthenticated.']);
+    });
 
-    $response = $this->actingAs($user)->get('/owner/dashboard');
+    test('returns JSON response for unauthorized API requests', function () {
+        $role = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
+        $user = User::factory()->create(['role_id' => $role->id]);
 
-    $response->assertForbidden();
-});
+        $response = $this->actingAs($user)->getJson('/test-route');
 
-test('super admin cannot access agent dashboard', function () {
-    $user = User::where('email', 'admin@leadmanager.com')->first();
+        $response->assertStatus(403)
+            ->assertJson(['message' => 'Unauthorized action.']);
+    });
 
-    $response = $this->actingAs($user)->get('/agent/dashboard');
+    test('handles multiple roles', function () {
+        Route::middleware('role:super_admin,call_center_owner')->get('/test-multi-role', function () {
+            return response()->json(['message' => 'Success']);
+        });
 
-    $response->assertForbidden();
-});
+        $role = Role::firstOrCreate(['slug' => 'call_center_owner'], ['name' => 'Call Center Owner']);
+        $user = User::factory()->create(['role_id' => $role->id]);
 
-test('call center owner cannot access admin dashboard', function () {
-    $user = User::where('email', 'owner@leadmanager.com')->first();
+        $response = $this->actingAs($user)->get('/test-multi-role');
 
-    $response = $this->actingAs($user)->get('/admin/dashboard');
+        $response->assertSuccessful();
+    });
 
-    $response->assertForbidden();
-});
+    test('denies access when user has no role', function () {
+        $user = User::factory()->create(['role_id' => null]);
 
-test('call center owner cannot access agent dashboard', function () {
-    $user = User::where('email', 'owner@leadmanager.com')->first();
+        $response = $this->actingAs($user)->get('/test-route');
 
-    $response = $this->actingAs($user)->get('/agent/dashboard');
-
-    $response->assertForbidden();
-});
-
-test('agent cannot access admin dashboard', function () {
-    $user = User::where('email', 'agent1@leadmanager.com')->first();
-
-    $response = $this->actingAs($user)->get('/admin/dashboard');
-
-    $response->assertForbidden();
-});
-
-test('agent cannot access owner dashboard', function () {
-    $user = User::where('email', 'agent1@leadmanager.com')->first();
-
-    $response = $this->actingAs($user)->get('/owner/dashboard');
-
-    $response->assertForbidden();
-});
-
-test('unauthenticated user is redirected to login when accessing protected route', function () {
-    $response = $this->get('/admin/dashboard');
-
-    $response->assertRedirect('/login');
-});
-
-test('user without role cannot access any dashboard', function () {
-    $user = User::factory()->create(['role_id' => null]);
-
-    $response = $this->actingAs($user)->get('/admin/dashboard');
-
-    $response->assertForbidden();
-});
-
-test('middleware returns json response for api requests', function () {
-    $user = User::where('email', 'agent1@leadmanager.com')->first();
-
-    $response = $this->actingAs($user)
-        ->getJson('/admin/dashboard');
-
-    $response->assertStatus(403)
-        ->assertJson(['message' => 'Unauthorized action.']);
-});
-
-test('middleware returns json response for unauthenticated api requests', function () {
-    $response = $this->getJson('/admin/dashboard');
-
-    $response->assertStatus(401)
-        ->assertJson(['message' => 'Unauthenticated.']);
+        $response->assertForbidden();
+    });
 });

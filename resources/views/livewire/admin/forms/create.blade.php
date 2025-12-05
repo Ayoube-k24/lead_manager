@@ -431,10 +431,45 @@ function toggleApiHelp() {
     icon.classList.toggle('rotate-180');
 }
 
+function showCopyNotification(message, type = 'success') {
+    // Créer l'élément de notification
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 z-50 rounded-lg px-4 py-3 shadow-lg transition-all duration-300 ${
+        type === 'success' 
+            ? 'bg-green-500 text-white' 
+            : 'bg-red-500 text-white'
+    }`;
+    notification.style.opacity = '0';
+    notification.style.transform = 'translateY(-20px)';
+    notification.textContent = message;
+    
+    // Ajouter au DOM
+    document.body.appendChild(notification);
+    
+    // Animation d'entrée
+    setTimeout(() => {
+        notification.style.opacity = '1';
+        notification.style.transform = 'translateY(0)';
+    }, 10);
+    
+    // Supprimer après 3 secondes
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        notification.style.transform = 'translateY(-20px)';
+        setTimeout(() => {
+            if (document.body.contains(notification)) {
+                document.body.removeChild(notification);
+            }
+        }, 300);
+    }, 3000);
+}
+
 function copyJsExample() {
     const code = document.getElementById('js-example').textContent;
     navigator.clipboard.writeText(code).then(() => {
-        alert('Code JavaScript copié dans le presse-papiers !');
+        showCopyNotification('Code JavaScript copié dans le presse-papiers !');
+    }).catch(() => {
+        showCopyNotification('Erreur lors de la copie', 'error');
     });
 }
 </script>

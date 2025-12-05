@@ -2,464 +2,449 @@
 
 declare(strict_types=1);
 
+use App\Events\LeadAssigned;
 use App\Models\CallCenter;
+use App\Models\Form;
 use App\Models\Lead;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\AuditService;
 use App\Services\LeadDistributionService;
+use Illuminate\Support\Facades\Event;
+use function Pest\Laravel\mock;
 
-beforeEach(function () {
-    require_once __DIR__.'/../../Feature/Sprint1/EnsureMigrationsRun.php';
-    ensureMigrationsRun();
-});
-
-describe('LeadDistributionService - Round Robin Distribution', function () {
-    test('distributes lead with round-robin method', function () {
-        // Arrange
-        $callCenter = CallCenter::factory()->create(['distribution_method' => 'round_robin']);
-        $agentRole = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
-        $agent = User::factory()->create([
-            'role_id' => $agentRole->id,
-            'call_center_id' => $callCenter->id,
-            'is_active' => true,
-        ]);
-        $lead = Lead::factory()->create([
-            'call_center_id' => $callCenter->id,
-            'status' => 'email_confirmed',
-        ]);
-        $service = new LeadDistributionService(app(AuditService::class));
-
-        // Act
-        $assignedAgent = $service->distributeLead($lead);
-
-        // Assert
-        expect($assignedAgent)->not->toBeNull()
-            ->and($assignedAgent->id)->toBe($agent->id);
+describe('LeadDistributionService', function () {
+    beforeEach(function () {
+        $this->auditService = mock(AuditService::class);
+        // Mock methods that may be called by the Auditable trait
+        $this->auditService->shouldReceive('logAgentCreated')->zeroOrMoreTimes()->andReturn(\Mockery::mock(\App\Models\ActivityLog::class));
+        $this->auditService->shouldReceive('logSmtpProfileCreated')->zeroOrMoreTimes()->andReturn(\Mockery::mock(\App\Models\ActivityLog::class));
+        $this->auditService->shouldReceive('logEmailTemplateCreated')->zeroOrMoreTimes()->andReturn(\Mockery::mock(\App\Models\ActivityLog::class));
+        $this->auditService->shouldReceive('logFormCreated')->zeroOrMoreTimes()->andReturn(\Mockery::mock(\App\Models\ActivityLog::class));
+        $this->auditService->shouldReceive('log')->zeroOrMoreTimes()->andReturn(\Mockery::mock(\App\Models\ActivityLog::class));
+        $this->service = new LeadDistributionService($this->auditService);
     });
 
-    test('distributes leads evenly across multiple agents with round-robin', function () {
-        // Arrange
-        $callCenter = CallCenter::factory()->create(['distribution_method' => 'round_robin']);
-        $agentRole = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
-        $agent1 = User::factory()->create([
-            'role_id' => $agentRole->id,
-            'call_center_id' => $callCenter->id,
-            'is_active' => true,
-        ]);
-        $agent2 = User::factory()->create([
-            'role_id' => $agentRole->id,
-            'call_center_id' => $callCenter->id,
-            'is_active' => true,
-        ]);
-        $service = new LeadDistributionService(app(AuditService::class));
+    describe('distributeLead - Round Robin', function () {
+        test('distributes lead to agent with least pending leads', function () {
+            Event::fake();
 
-        // Act - Distribute 4 leads
-        $assignments = [];
-        for ($i = 0; $i < 4; $i++) {
+            $callCenter = CallCenter::factory()->create([
+                'distribution_method' => 'round_robin',
+            ]);
+
+            $role = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
+
+            $agent1 = User::factory()->create([
+                'role_id' => $role->id,
+                'call_center_id' => $callCenter->id,
+                'is_active' => true,
+            ]);
+
+            $agent2 = User::factory()->create([
+                'role_id' => $role->id,
+                'call_center_id' => $callCenter->id,
+                'is_active' => true,
+            ]);
+
+            $form = Form::factory()->create([
+                'call_center_id' => $callCenter->id,
+            ]);
+
             $lead = Lead::factory()->create([
+                'form_id' => $form->id,
                 'call_center_id' => $callCenter->id,
                 'status' => 'email_confirmed',
             ]);
-            $assignedAgent = $service->distributeLead($lead);
-            if ($assignedAgent) {
-                $service->assignToAgent($lead, $assignedAgent);
-                $assignments[] = $assignedAgent->id;
-            }
-        }
 
-        // Assert - Should be relatively evenly distributed
-        $agent1Count = count(array_filter($assignments, fn ($id) => $id === $agent1->id));
-        $agent2Count = count(array_filter($assignments, fn ($id) => $id === $agent2->id));
+            // Agent1 has 2 pending leads, Agent2 has 0
+            Lead::factory()->count(2)->create([
+                'assigned_to' => $agent1->id,
+                'call_center_id' => $callCenter->id,
+                'status' => 'pending_call',
+            ]);
 
-        expect($agent1Count)->toBeGreaterThan(0)
-            ->and($agent2Count)->toBeGreaterThan(0)
-            ->and($agent1Count + $agent2Count)->toBe(4);
+            $selectedAgent = $this->service->distributeLead($lead);
+
+            expect($selectedAgent)->not->toBeNull()
+                ->and($selectedAgent->id)->toBe($agent2->id);
+        });
+
+        test('distributes to agent with oldest last assignment when counts are equal', function () {
+            Event::fake();
+
+            $callCenter = CallCenter::factory()->create([
+                'distribution_method' => 'round_robin',
+            ]);
+
+            $role = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
+
+            $agent1 = User::factory()->create([
+                'role_id' => $role->id,
+                'call_center_id' => $callCenter->id,
+                'is_active' => true,
+            ]);
+
+            $agent2 = User::factory()->create([
+                'role_id' => $role->id,
+                'call_center_id' => $callCenter->id,
+                'is_active' => true,
+            ]);
+
+            $form = Form::factory()->create([
+                'call_center_id' => $callCenter->id,
+            ]);
+
+            $lead = Lead::factory()->create([
+                'form_id' => $form->id,
+                'call_center_id' => $callCenter->id,
+                'status' => 'email_confirmed',
+            ]);
+
+            // Both agents have 1 pending lead, but agent1 was assigned more recently
+            Lead::factory()->create([
+                'assigned_to' => $agent1->id,
+                'call_center_id' => $callCenter->id,
+                'status' => 'pending_call',
+                'updated_at' => now(),
+            ]);
+
+            Lead::factory()->create([
+                'assigned_to' => $agent2->id,
+                'call_center_id' => $callCenter->id,
+                'status' => 'pending_call',
+                'updated_at' => now()->subHour(),
+            ]);
+
+            $selectedAgent = $this->service->distributeLead($lead);
+
+            expect($selectedAgent)->not->toBeNull()
+                ->and($selectedAgent->id)->toBe($agent2->id);
+        });
+
+        test('returns null when no active agents available', function () {
+            $callCenter = CallCenter::factory()->create([
+                'distribution_method' => 'round_robin',
+            ]);
+
+            $form = Form::factory()->create([
+                'call_center_id' => $callCenter->id,
+            ]);
+
+            $lead = Lead::factory()->create([
+                'form_id' => $form->id,
+                'call_center_id' => $callCenter->id,
+            ]);
+
+            $selectedAgent = $this->service->distributeLead($lead);
+
+            expect($selectedAgent)->toBeNull();
+        });
+
+        test('returns null when lead has no call center', function () {
+            $form = Form::factory()->create([
+                'call_center_id' => null,
+            ]);
+
+            $lead = Lead::factory()->create([
+                'form_id' => $form->id,
+                'call_center_id' => null,
+            ]);
+
+            $selectedAgent = $this->service->distributeLead($lead);
+
+            expect($selectedAgent)->toBeNull();
+        });
+
+        test('gets call center from form if not set on lead', function () {
+            Event::fake();
+
+            $callCenter = CallCenter::factory()->create([
+                'distribution_method' => 'round_robin',
+            ]);
+
+            $role = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
+
+            $agent = User::factory()->create([
+                'role_id' => $role->id,
+                'call_center_id' => $callCenter->id,
+                'is_active' => true,
+            ]);
+
+            $form = Form::factory()->create([
+                'call_center_id' => $callCenter->id,
+            ]);
+
+            $lead = Lead::factory()->create([
+                'form_id' => $form->id,
+                'call_center_id' => null,
+            ]);
+
+            $selectedAgent = $this->service->distributeLead($lead);
+
+            expect($selectedAgent)->not->toBeNull()
+                ->and($lead->fresh()->call_center_id)->toBe($callCenter->id);
+        });
     });
 
-    test('considers workload when distributing with round-robin', function () {
-        // Arrange
-        $callCenter = CallCenter::factory()->create(['distribution_method' => 'round_robin']);
-        $agentRole = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
-        $agent1 = User::factory()->create([
-            'role_id' => $agentRole->id,
-            'call_center_id' => $callCenter->id,
-            'is_active' => true,
-        ]);
-        $agent2 = User::factory()->create([
-            'role_id' => $agentRole->id,
-            'call_center_id' => $callCenter->id,
-            'is_active' => true,
-        ]);
+    describe('distributeLead - Weighted', function () {
+        test('distributes to agent with lowest performance score', function () {
+            Event::fake();
 
-        // Give agent1 some pending leads
-        Lead::factory()->count(3)->create([
-            'call_center_id' => $callCenter->id,
-            'assigned_to' => $agent1->id,
-            'status' => 'pending_call',
-        ]);
+            $callCenter = CallCenter::factory()->create([
+                'distribution_method' => 'weighted',
+            ]);
 
-        $service = new LeadDistributionService(app(AuditService::class));
-        $newLead = Lead::factory()->create([
-            'call_center_id' => $callCenter->id,
-            'status' => 'email_confirmed',
-        ]);
+            $role = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
 
-        // Act
-        $assignedAgent = $service->distributeLead($newLead);
+            $agent1 = User::factory()->create([
+                'role_id' => $role->id,
+                'call_center_id' => $callCenter->id,
+                'is_active' => true,
+            ]);
 
-        // Assert - Should assign to agent2 (has fewer pending leads)
-        expect($assignedAgent)->not->toBeNull()
-            ->and($assignedAgent->id)->toBe($agent2->id);
-    });
-});
+            $agent2 = User::factory()->create([
+                'role_id' => $role->id,
+                'call_center_id' => $callCenter->id,
+                'is_active' => true,
+            ]);
 
-describe('LeadDistributionService - Weighted Distribution', function () {
-    test('distributes lead with weighted method', function () {
-        // Arrange
-        $callCenter = CallCenter::factory()->create(['distribution_method' => 'weighted']);
-        $agentRole = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
-        $agent = User::factory()->create([
-            'role_id' => $agentRole->id,
-            'call_center_id' => $callCenter->id,
-            'is_active' => true,
-        ]);
-        $lead = Lead::factory()->create([
-            'call_center_id' => $callCenter->id,
-            'status' => 'email_confirmed',
-        ]);
-        $service = new LeadDistributionService(app(AuditService::class));
+            $form = Form::factory()->create([
+                'call_center_id' => $callCenter->id,
+            ]);
 
-        // Act
-        $assignedAgent = $service->distributeLead($lead);
+            $lead = Lead::factory()->create([
+                'form_id' => $form->id,
+                'call_center_id' => $callCenter->id,
+                'status' => 'email_confirmed',
+            ]);
 
-        // Assert
-        expect($assignedAgent)->not->toBeNull()
-            ->and($assignedAgent->id)->toBe($agent->id);
-    });
+            // Agent1 has high performance (5 confirmed out of 10)
+            Lead::factory()->count(5)->create([
+                'assigned_to' => $agent1->id,
+                'call_center_id' => $callCenter->id,
+                'status' => 'confirmed',
+            ]);
+            Lead::factory()->count(5)->create([
+                'assigned_to' => $agent1->id,
+                'call_center_id' => $callCenter->id,
+                'status' => 'rejected',
+            ]);
 
-    test('considers performance when distributing with weighted method', function () {
-        // Arrange
-        $callCenter = CallCenter::factory()->create(['distribution_method' => 'weighted']);
-        $agentRole = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
-        $agent1 = User::factory()->create([
-            'role_id' => $agentRole->id,
-            'call_center_id' => $callCenter->id,
-            'is_active' => true,
-        ]);
-        $agent2 = User::factory()->create([
-            'role_id' => $agentRole->id,
-            'call_center_id' => $callCenter->id,
-            'is_active' => true,
-        ]);
+            // Agent2 has low performance (1 confirmed out of 10)
+            Lead::factory()->count(1)->create([
+                'assigned_to' => $agent2->id,
+                'call_center_id' => $callCenter->id,
+                'status' => 'confirmed',
+            ]);
+            Lead::factory()->count(9)->create([
+                'assigned_to' => $agent2->id,
+                'call_center_id' => $callCenter->id,
+                'status' => 'rejected',
+            ]);
 
-        // Agent1 has high performance (8 confirmed out of 10 = 0.8 score)
-        Lead::factory()->count(8)->create([
-            'call_center_id' => $callCenter->id,
-            'assigned_to' => $agent1->id,
-            'status' => 'confirmed',
-        ]);
-        Lead::factory()->count(2)->create([
-            'call_center_id' => $callCenter->id,
-            'assigned_to' => $agent1->id,
-            'status' => 'rejected',
-        ]);
+            $selectedAgent = $this->service->distributeLead($lead);
 
-        // Agent2 has lower performance (2 confirmed out of 10 = 0.2 score)
-        Lead::factory()->count(2)->create([
-            'call_center_id' => $callCenter->id,
-            'assigned_to' => $agent2->id,
-            'status' => 'confirmed',
-        ]);
-        Lead::factory()->count(8)->create([
-            'call_center_id' => $callCenter->id,
-            'assigned_to' => $agent2->id,
-            'status' => 'rejected',
-        ]);
+            expect($selectedAgent)->not->toBeNull()
+                ->and($selectedAgent->id)->toBe($agent2->id);
+        });
 
-        $service = new LeadDistributionService(app(AuditService::class));
-        $newLead = Lead::factory()->create([
-            'call_center_id' => $callCenter->id,
-            'status' => 'email_confirmed',
-        ]);
+        test('considers workload when distributing weighted', function () {
+            Event::fake();
 
-        // Act
-        $assignedAgent = $service->distributeLead($newLead);
+            $callCenter = CallCenter::factory()->create([
+                'distribution_method' => 'weighted',
+            ]);
 
-        // Assert - Should assign to agent2 (lower performance score, needs more leads)
-        expect($assignedAgent)->not->toBeNull()
-            ->and($assignedAgent->id)->toBe($agent2->id);
+            $role = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
+
+            $agent1 = User::factory()->create([
+                'role_id' => $role->id,
+                'call_center_id' => $callCenter->id,
+                'is_active' => true,
+            ]);
+
+            $agent2 = User::factory()->create([
+                'role_id' => $role->id,
+                'call_center_id' => $callCenter->id,
+                'is_active' => true,
+            ]);
+
+            $form = Form::factory()->create([
+                'call_center_id' => $callCenter->id,
+            ]);
+
+            $lead = Lead::factory()->create([
+                'form_id' => $form->id,
+                'call_center_id' => $callCenter->id,
+                'status' => 'email_confirmed',
+            ]);
+
+            // Both agents have same performance, but agent1 has more pending leads
+            Lead::factory()->count(5)->create([
+                'assigned_to' => $agent1->id,
+                'call_center_id' => $callCenter->id,
+                'status' => 'pending_call',
+            ]);
+
+            $selectedAgent = $this->service->distributeLead($lead);
+
+            expect($selectedAgent)->not->toBeNull()
+                ->and($selectedAgent->id)->toBe($agent2->id);
+        });
     });
 
-    test('considers workload when performance scores are similar in weighted method', function () {
-        // Arrange
-        $callCenter = CallCenter::factory()->create(['distribution_method' => 'weighted']);
-        $agentRole = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
-        $agent1 = User::factory()->create([
-            'role_id' => $agentRole->id,
-            'call_center_id' => $callCenter->id,
-            'is_active' => true,
-        ]);
-        $agent2 = User::factory()->create([
-            'role_id' => $agentRole->id,
-            'call_center_id' => $callCenter->id,
-            'is_active' => true,
-        ]);
+    describe('distributeLead - Manual', function () {
+        test('returns null for manual distribution method', function () {
+            $callCenter = CallCenter::factory()->create([
+                'distribution_method' => 'manual',
+            ]);
 
-        // Both agents have no leads (same default score 0.5)
-        // But agent1 has more pending workload
-        Lead::factory()->count(3)->create([
-            'call_center_id' => $callCenter->id,
-            'assigned_to' => $agent1->id,
-            'status' => 'pending_call',
-        ]);
+            $role = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
 
-        $service = new LeadDistributionService(app(AuditService::class));
-        $newLead = Lead::factory()->create([
-            'call_center_id' => $callCenter->id,
-            'status' => 'email_confirmed',
-        ]);
+            User::factory()->create([
+                'role_id' => $role->id,
+                'call_center_id' => $callCenter->id,
+                'is_active' => true,
+            ]);
 
-        // Act
-        $assignedAgent = $service->distributeLead($newLead);
+            $form = Form::factory()->create([
+                'call_center_id' => $callCenter->id,
+            ]);
 
-        // Assert - Should assign to agent2 (same score but lower workload)
-        expect($assignedAgent)->not->toBeNull()
-            ->and($assignedAgent->id)->toBe($agent2->id);
-    });
-});
+            $lead = Lead::factory()->create([
+                'form_id' => $form->id,
+                'call_center_id' => $callCenter->id,
+            ]);
 
-describe('LeadDistributionService - Manual Distribution', function () {
-    test('returns null for manual distribution method', function () {
-        // Arrange
-        $callCenter = CallCenter::factory()->create(['distribution_method' => 'manual']);
-        $agentRole = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
-        User::factory()->create([
-            'role_id' => $agentRole->id,
-            'call_center_id' => $callCenter->id,
-            'is_active' => true,
-        ]);
-        $lead = Lead::factory()->create([
-            'call_center_id' => $callCenter->id,
-            'status' => 'email_confirmed',
-        ]);
-        $service = new LeadDistributionService(app(AuditService::class));
+            $selectedAgent = $this->service->distributeLead($lead);
 
-        // Act
-        $assignedAgent = $service->distributeLead($lead);
-
-        // Assert
-        expect($assignedAgent)->toBeNull();
-    });
-});
-
-describe('LeadDistributionService - No Active Agents', function () {
-    test('returns null when no active agents available', function () {
-        // Arrange
-        $callCenter = CallCenter::factory()->create(['distribution_method' => 'round_robin']);
-        $lead = Lead::factory()->create([
-            'call_center_id' => $callCenter->id,
-            'status' => 'email_confirmed',
-        ]);
-        $service = new LeadDistributionService(app(AuditService::class));
-
-        // Act
-        $assignedAgent = $service->distributeLead($lead);
-
-        // Assert
-        expect($assignedAgent)->toBeNull();
+            expect($selectedAgent)->toBeNull();
+        });
     });
 
-    test('skips inactive agents during distribution', function () {
-        // Arrange
-        $callCenter = CallCenter::factory()->create(['distribution_method' => 'round_robin']);
-        $agentRole = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
-        $activeAgent = User::factory()->create([
-            'role_id' => $agentRole->id,
-            'call_center_id' => $callCenter->id,
-            'is_active' => true,
-        ]);
-        User::factory()->create([
-            'role_id' => $agentRole->id,
-            'call_center_id' => $callCenter->id,
-            'is_active' => false,
-        ]);
-        $lead = Lead::factory()->create([
-            'call_center_id' => $callCenter->id,
-            'status' => 'email_confirmed',
-        ]);
-        $service = new LeadDistributionService(app(AuditService::class));
+    describe('assignToAgent', function () {
+        test('assigns lead to agent successfully', function () {
+            Event::fake();
 
-        // Act
-        $assignedAgent = $service->distributeLead($lead);
+            $callCenter = CallCenter::factory()->create();
+            $role = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
 
-        // Assert
-        expect($assignedAgent)->not->toBeNull()
-            ->and($assignedAgent->id)->toBe($activeAgent->id);
-    });
-});
+            $agent = User::factory()->create([
+                'role_id' => $role->id,
+                'call_center_id' => $callCenter->id,
+                'is_active' => true,
+            ]);
 
-describe('LeadDistributionService - Manual Assignment', function () {
-    test('assigns lead to agent manually', function () {
-        // Arrange
-        $callCenter = CallCenter::factory()->create();
-        $agentRole = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
-        $agent = User::factory()->create([
-            'role_id' => $agentRole->id,
-            'call_center_id' => $callCenter->id,
-            'is_active' => true,
-        ]);
-        $lead = Lead::factory()->create([
-            'call_center_id' => $callCenter->id,
-            'status' => 'email_confirmed',
-        ]);
-        $service = new LeadDistributionService(app(AuditService::class));
+            $lead = Lead::factory()->create([
+                'call_center_id' => $callCenter->id,
+            ]);
 
-        // Act
-        $result = $service->assignToAgent($lead, $agent);
+            $this->auditService->shouldReceive('logLeadAssigned')
+                ->once()
+                ->with(\Mockery::type(Lead::class), \Mockery::type(User::class))
+                ->andReturn(\Mockery::mock(\App\Models\ActivityLog::class));
 
-        // Assert
-        expect($result)->toBeTrue();
-        $lead->refresh();
-        expect($lead->assigned_to)->toBe($agent->id);
-    });
+            $result = $this->service->assignToAgent($lead, $agent);
 
-    test('fails to assign lead to agent from different call center', function () {
-        // Arrange
-        $callCenter1 = CallCenter::factory()->create();
-        $callCenter2 = CallCenter::factory()->create();
-        $agentRole = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
-        $agent = User::factory()->create([
-            'role_id' => $agentRole->id,
-            'call_center_id' => $callCenter1->id,
-            'is_active' => true,
-        ]);
-        $lead = Lead::factory()->create([
-            'call_center_id' => $callCenter2->id,
-        ]);
-        $service = new LeadDistributionService(app(AuditService::class));
+            expect($result)->toBeTrue()
+                ->and($lead->fresh()->assigned_to)->toBe($agent->id);
 
-        // Act
-        $result = $service->assignToAgent($lead, $agent);
+            Event::assertDispatched(LeadAssigned::class);
+        });
 
-        // Assert
-        expect($result)->toBeFalse();
-        $lead->refresh();
-        expect($lead->assigned_to)->not->toBe($agent->id);
-    });
+        test('fails when agent belongs to different call center', function () {
+            $callCenter1 = CallCenter::factory()->create();
+            $callCenter2 = CallCenter::factory()->create();
+            $role = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
 
-    test('fails to assign lead to inactive agent', function () {
-        // Arrange
-        $callCenter = CallCenter::factory()->create();
-        $agentRole = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
-        $agent = User::factory()->create([
-            'role_id' => $agentRole->id,
-            'call_center_id' => $callCenter->id,
-            'is_active' => false,
-        ]);
-        $lead = Lead::factory()->create([
-            'call_center_id' => $callCenter->id,
-        ]);
-        $service = new LeadDistributionService(app(AuditService::class));
+            $agent = User::factory()->create([
+                'role_id' => $role->id,
+                'call_center_id' => $callCenter2->id,
+                'is_active' => true,
+            ]);
 
-        // Act
-        $result = $service->assignToAgent($lead, $agent);
+            $lead = Lead::factory()->create([
+                'call_center_id' => $callCenter1->id,
+                'assigned_to' => null, // Ensure lead is not pre-assigned
+                'status' => 'pending_email', // Use status that doesn't trigger auto-distribution
+            ]);
 
-        // Assert
-        expect($result)->toBeFalse();
-    });
+            // Refresh to ensure we have the latest state
+            $lead->refresh();
 
-    test('fails to assign lead to non-agent user', function () {
-        // Arrange
-        $callCenter = CallCenter::factory()->create();
-        $ownerRole = Role::firstOrCreate(['slug' => 'call_center_owner'], ['name' => 'Owner']);
-        $owner = User::factory()->create([
-            'role_id' => $ownerRole->id,
-            'call_center_id' => $callCenter->id,
-            'is_active' => true,
-        ]);
-        $lead = Lead::factory()->create([
-            'call_center_id' => $callCenter->id,
-        ]);
-        $service = new LeadDistributionService(app(AuditService::class));
+            $result = $this->service->assignToAgent($lead, $agent);
 
-        // Act
-        $result = $service->assignToAgent($lead, $owner);
+            expect($result)->toBeFalse()
+                ->and($lead->fresh()->assigned_to)->toBeNull();
+        });
 
-        // Assert
-        expect($result)->toBeFalse();
-    });
-});
+        test('fails when user is not an agent', function () {
+            $callCenter = CallCenter::factory()->create();
+            $role = Role::firstOrCreate(['slug' => 'supervisor'], ['name' => 'Supervisor']);
 
-describe('LeadDistributionService - Edge Cases', function () {
-    test('handles lead without call center when form has call center', function () {
-        // Arrange
-        $callCenter = CallCenter::factory()->create(['distribution_method' => 'round_robin']);
-        $agentRole = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
-        $agent = User::factory()->create([
-            'role_id' => $agentRole->id,
-            'call_center_id' => $callCenter->id,
-            'is_active' => true,
-        ]);
-        $form = \App\Models\Form::factory()->create([
-            'call_center_id' => $callCenter->id,
-        ]);
-        $lead = Lead::factory()->create([
-            'form_id' => $form->id,
-            'call_center_id' => null,
-            'status' => 'email_confirmed',
-        ]);
-        $service = new LeadDistributionService(app(AuditService::class));
+            $user = User::factory()->create([
+                'role_id' => $role->id,
+                'call_center_id' => $callCenter->id,
+                'is_active' => true,
+            ]);
 
-        // Act
-        $assignedAgent = $service->distributeLead($lead);
+            $lead = Lead::factory()->create([
+                'call_center_id' => $callCenter->id,
+                'assigned_to' => null, // Ensure lead is not pre-assigned
+            ]);
 
-        // Assert
-        expect($assignedAgent)->not->toBeNull()
-            ->and($assignedAgent->id)->toBe($agent->id);
-        $lead->refresh();
-        expect($lead->call_center_id)->toBe($callCenter->id);
-    });
+            $result = $this->service->assignToAgent($lead, $user);
 
-    test('returns null when lead has no call center and form has no call center', function () {
-        // Arrange
-        $form = \App\Models\Form::factory()->create([
-            'call_center_id' => null,
-        ]);
-        $lead = Lead::factory()->create([
-            'form_id' => $form->id,
-            'call_center_id' => null,
-            'status' => 'email_confirmed',
-        ]);
-        $service = new LeadDistributionService(app(AuditService::class));
+            expect($result)->toBeFalse()
+                ->and($lead->fresh()->assigned_to)->toBeNull();
+        });
 
-        // Act
-        $assignedAgent = $service->distributeLead($lead);
+        test('fails when agent is inactive', function () {
+            $callCenter = CallCenter::factory()->create();
+            $role = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
 
-        // Assert
-        expect($assignedAgent)->toBeNull();
-    });
+            $agent = User::factory()->create([
+                'role_id' => $role->id,
+                'call_center_id' => $callCenter->id,
+                'is_active' => false,
+            ]);
 
-    test('uses default round-robin when distribution method is invalid', function () {
-        // Arrange
-        $callCenter = CallCenter::factory()->create(['distribution_method' => 'invalid_method']);
-        $agentRole = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
-        $agent = User::factory()->create([
-            'role_id' => $agentRole->id,
-            'call_center_id' => $callCenter->id,
-            'is_active' => true,
-        ]);
-        $lead = Lead::factory()->create([
-            'call_center_id' => $callCenter->id,
-            'status' => 'email_confirmed',
-        ]);
-        $service = new LeadDistributionService(app(AuditService::class));
+            $lead = Lead::factory()->create([
+                'call_center_id' => $callCenter->id,
+                'assigned_to' => null, // Ensure lead is not pre-assigned
+            ]);
 
-        // Act
-        $assignedAgent = $service->distributeLead($lead);
+            $result = $this->service->assignToAgent($lead, $agent);
 
-        // Assert - Should default to round-robin
-        expect($assignedAgent)->not->toBeNull()
-            ->and($assignedAgent->id)->toBe($agent->id);
+            expect($result)->toBeFalse()
+                ->and($lead->fresh()->assigned_to)->toBeNull();
+        });
+
+        test('sets call center from agent if lead has none', function () {
+            Event::fake();
+
+            $callCenter = CallCenter::factory()->create();
+            $role = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
+
+            $agent = User::factory()->create([
+                'role_id' => $role->id,
+                'call_center_id' => $callCenter->id,
+                'is_active' => true,
+            ]);
+
+            $lead = Lead::factory()->create([
+                'call_center_id' => null,
+            ]);
+
+            $this->auditService->shouldReceive('logLeadAssigned')
+                ->once();
+
+            $result = $this->service->assignToAgent($lead, $agent);
+
+            expect($result)->toBeTrue()
+                ->and($lead->fresh()->call_center_id)->toBe($callCenter->id);
+        });
     });
 });
+

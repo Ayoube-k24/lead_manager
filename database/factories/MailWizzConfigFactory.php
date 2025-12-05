@@ -30,8 +30,8 @@ class MailWizzConfigFactory extends Factory
     {
         return [
             'api_url' => 'https://'.fake()->domainName(),
-            'public_key' => fake()->sha256(),
-            'private_key' => fake()->sha256(),
+            'public_key' => hash('sha256', fake()->text(32)),
+            'private_key' => hash('sha256', fake()->text(32)), // Generate a valid SHA256 hash
             'list_uid' => fake()->uuid(),
             'call_center_id' => \App\Models\CallCenter::factory(),
             'import_frequency' => 15,

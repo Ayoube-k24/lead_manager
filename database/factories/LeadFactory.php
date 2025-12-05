@@ -40,6 +40,7 @@ class LeadFactory extends Factory
             'call_center_id' => \App\Models\CallCenter::factory(),
             'call_comment' => fake()->optional()->paragraph(),
             'called_at' => fake()->optional()->dateTime(),
+            'score' => 0, // Default score
         ];
     }
 

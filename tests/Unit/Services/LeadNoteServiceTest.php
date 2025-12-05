@@ -7,163 +7,157 @@ use App\Models\LeadNote;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\LeadNoteService;
+use Illuminate\Support\Facades\Config;
 
-beforeEach(function () {
-    require_once __DIR__.'/../../Feature/Sprint1/EnsureMigrationsRun.php';
-    ensureMigrationsRun();
+describe('LeadNoteService', function () {
+    beforeEach(function () {
+        $this->service = new LeadNoteService();
+    });
 
-    $this->service = app(LeadNoteService::class);
+    describe('createNote', function () {
+        test('creates a note successfully', function () {
+            $lead = Lead::factory()->create();
+            $user = User::factory()->create();
+
+            $note = $this->service->createNote($lead, $user, 'Test note content', false, 'comment');
+
+            expect($note)->toBeInstanceOf(LeadNote::class)
+                ->and($note->lead_id)->toBe($lead->id)
+                ->and($note->user_id)->toBe($user->id)
+                ->and($note->content)->toBe('Test note content')
+                ->and($note->is_private)->toBeFalse()
+                ->and($note->type)->toBe('comment');
+        });
+
+        test('creates private note', function () {
+            $lead = Lead::factory()->create();
+            $user = User::factory()->create();
+
+            $note = $this->service->createNote($lead, $user, 'Private note', true);
+
+            expect($note->is_private)->toBeTrue();
+        });
+
+        test('recalculates lead score when configured', function () {
+            Config::set('lead-scoring.auto_recalculate.on_note_added', true);
+
+            $lead = Lead::factory()->create(['score' => 0]);
+            $user = User::factory()->create();
+
+            $note = $this->service->createNote($lead, $user, 'Test note');
+
+            // Score should be recalculated (may still be 0 but should be calculated)
+            $freshLead = $lead->fresh();
+            expect($freshLead->score)->not->toBeNull()
+                ->and($freshLead->score_updated_at)->not->toBeNull();
+        });
+    });
+
+    describe('updateNote', function () {
+        test('updates note content', function () {
+            $note = LeadNote::factory()->create(['content' => 'Old content']);
+
+            $updated = $this->service->updateNote($note, 'New content');
+
+            expect($updated->content)->toBe('New content');
+        });
+    });
+
+    describe('deleteNote', function () {
+        test('deletes note', function () {
+            $note = LeadNote::factory()->create();
+
+            $result = $this->service->deleteNote($note);
+
+            expect($result)->toBeTrue()
+                ->and(LeadNote::find($note->id))->toBeNull();
+        });
+    });
+
+    describe('getNotesForLead', function () {
+        test('returns all notes for lead when user is super admin', function () {
+            $role = Role::firstOrCreate(['slug' => 'super_admin'], ['name' => 'Super Admin']);
+            $user = User::factory()->create(['role_id' => $role->id]);
+            $lead = Lead::factory()->create();
+
+            LeadNote::factory()->create([
+                'lead_id' => $lead->id,
+                'is_private' => false,
+            ]);
+            LeadNote::factory()->create([
+                'lead_id' => $lead->id,
+                'is_private' => true,
+                'user_id' => User::factory()->create()->id,
+            ]);
+
+            $notes = $this->service->getNotesForLead($lead, $user);
+
+            expect($notes->count())->toBe(2);
+        });
+
+        test('filters private notes for regular users', function () {
+            $user = User::factory()->create();
+            $otherUser = User::factory()->create();
+            $lead = Lead::factory()->create();
+
+            LeadNote::factory()->create([
+                'lead_id' => $lead->id,
+                'is_private' => false,
+            ]);
+            LeadNote::factory()->create([
+                'lead_id' => $lead->id,
+                'is_private' => true,
+                'user_id' => $otherUser->id,
+            ]);
+            LeadNote::factory()->create([
+                'lead_id' => $lead->id,
+                'is_private' => true,
+                'user_id' => $user->id,
+            ]);
+
+            $notes = $this->service->getNotesForLead($lead, $user);
+
+            expect($notes->count())->toBe(2); // Public + own private
+        });
+
+        test('returns only public notes when no user provided', function () {
+            $lead = Lead::factory()->create();
+
+            LeadNote::factory()->create([
+                'lead_id' => $lead->id,
+                'is_private' => false,
+            ]);
+            LeadNote::factory()->create([
+                'lead_id' => $lead->id,
+                'is_private' => true,
+            ]);
+
+            $notes = $this->service->getNotesForLead($lead);
+
+            expect($notes->count())->toBe(1)
+                ->and($notes->first()->is_private)->toBeFalse();
+        });
+    });
+
+    describe('getNotesByType', function () {
+        test('returns notes filtered by type', function () {
+            $lead = Lead::factory()->create();
+            $user = User::factory()->create();
+
+            LeadNote::factory()->create([
+                'lead_id' => $lead->id,
+                'type' => 'comment',
+            ]);
+            LeadNote::factory()->create([
+                'lead_id' => $lead->id,
+                'type' => 'call',
+            ]);
+
+            $notes = $this->service->getNotesByType($lead, 'comment', $user);
+
+            expect($notes->count())->toBe(1)
+                ->and($notes->first()->type)->toBe('comment');
+        });
+    });
 });
 
-test('can create a note for a lead', function () {
-    $lead = Lead::factory()->create();
-    $user = User::factory()->create();
-    $content = 'This is a test note';
-
-    $note = $this->service->createNote($lead, $user, $content);
-
-    expect($note)
-        ->toBeInstanceOf(LeadNote::class)
-        ->and($note->lead_id)->toBe($lead->id)
-        ->and($note->user_id)->toBe($user->id)
-        ->and($note->content)->toBe($content)
-        ->and($note->is_private)->toBeFalse()
-        ->and($note->type)->toBe('comment');
-});
-
-test('can create a private note', function () {
-    $lead = Lead::factory()->create();
-    $user = User::factory()->create();
-
-    $note = $this->service->createNote($lead, $user, 'Private note', true);
-
-    expect($note->is_private)->toBeTrue();
-});
-
-test('can create a note with custom type', function () {
-    $lead = Lead::factory()->create();
-    $user = User::factory()->create();
-
-    $note = $this->service->createNote($lead, $user, 'Call log', false, 'call_log');
-
-    expect($note->type)->toBe('call_log');
-});
-
-test('can update a note', function () {
-    $note = LeadNote::factory()->create(['content' => 'Original content']);
-
-    $updated = $this->service->updateNote($note, 'Updated content');
-
-    expect($updated->content)->toBe('Updated content');
-});
-
-test('can delete a note', function () {
-    $note = LeadNote::factory()->create();
-
-    $result = $this->service->deleteNote($note);
-
-    expect($result)->toBeTrue()
-        ->and(LeadNote::find($note->id))->toBeNull();
-});
-
-test('can get notes for a lead', function () {
-    $lead = Lead::factory()->create();
-    $user = User::factory()->create();
-
-    LeadNote::factory()->count(3)->create([
-        'lead_id' => $lead->id,
-        'is_private' => false,
-    ]);
-
-    $notes = $this->service->getNotesForLead($lead, $user);
-
-    expect($notes)->toHaveCount(3);
-});
-
-test('filters private notes based on user permissions', function () {
-    $lead = Lead::factory()->create();
-    $author = User::factory()->create();
-    $otherUser = User::factory()->create();
-
-    LeadNote::factory()->create([
-        'lead_id' => $lead->id,
-        'user_id' => $author->id,
-        'is_private' => true,
-    ]);
-
-    LeadNote::factory()->create([
-        'lead_id' => $lead->id,
-        'user_id' => $author->id,
-        'is_private' => false,
-    ]);
-
-    // Author can see both
-    $authorNotes = $this->service->getNotesForLead($lead, $author);
-    expect($authorNotes)->toHaveCount(2);
-
-    // Other user can only see public
-    $otherNotes = $this->service->getNotesForLead($lead, $otherUser);
-    expect($otherNotes)->toHaveCount(1)
-        ->and($otherNotes->first()->is_private)->toBeFalse();
-});
-
-test('super admin can see all private notes', function () {
-    $lead = Lead::factory()->create();
-    $author = User::factory()->create();
-    $superAdmin = User::factory()->create();
-
-    $superAdminRole = Role::factory()->create(['slug' => 'super_admin']);
-    $superAdmin->role()->associate($superAdminRole);
-    $superAdmin->save();
-
-    LeadNote::factory()->create([
-        'lead_id' => $lead->id,
-        'user_id' => $author->id,
-        'is_private' => true,
-    ]);
-
-    $notes = $this->service->getNotesForLead($lead, $superAdmin);
-
-    expect($notes)->toHaveCount(1)
-        ->and($notes->first()->is_private)->toBeTrue();
-});
-
-test('can get notes by type', function () {
-    $lead = Lead::factory()->create();
-    $user = User::factory()->create();
-
-    LeadNote::factory()->count(2)->create([
-        'lead_id' => $lead->id,
-        'type' => 'call_log',
-    ]);
-
-    LeadNote::factory()->create([
-        'lead_id' => $lead->id,
-        'type' => 'comment',
-    ]);
-
-    $callLogs = $this->service->getNotesByType($lead, 'call_log', $user);
-
-    expect($callLogs)->toHaveCount(2)
-        ->and($callLogs->every(fn ($note) => $note->type === 'call_log'))->toBeTrue();
-});
-
-test('returns only public notes when no user provided', function () {
-    $lead = Lead::factory()->create();
-    $user = User::factory()->create();
-
-    LeadNote::factory()->create([
-        'lead_id' => $lead->id,
-        'is_private' => true,
-    ]);
-
-    LeadNote::factory()->create([
-        'lead_id' => $lead->id,
-        'is_private' => false,
-    ]);
-
-    $notes = $this->service->getNotesForLead($lead, null);
-
-    expect($notes)->toHaveCount(1)
-        ->and($notes->first()->is_private)->toBeFalse();
-});

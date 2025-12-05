@@ -2,9 +2,11 @@
 
 namespace App\Observers;
 
+use App\Events\LeadAssigned;
 use App\Models\Lead;
 use App\Services\LeadDistributionService;
 use App\Services\LeadScoringService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class LeadObserver
@@ -30,7 +32,19 @@ class LeadObserver
     {
         // Only attempt distribution if status is email_confirmed
         // This prevents unnecessary processing during initial creation
-        if ($lead->status === 'email_confirmed' && ! $lead->assigned_to) {
+        // Check both the status attribute and getStatusEnum() for compatibility
+        $status = $lead->status ?? $lead->getStatusEnum()->value ?? null;
+        
+        Log::debug('Observer: saved() called', [
+            'lead_id' => $lead->id,
+            'status' => $lead->status,
+            'status_id' => $lead->status_id,
+            'email_confirmed_at' => $lead->email_confirmed_at,
+            'assigned_to' => $lead->assigned_to,
+            'wasRecentlyCreated' => $lead->wasRecentlyCreated,
+        ]);
+        
+        if ($status === 'email_confirmed' && ! $lead->assigned_to) {
             $this->attemptDistribution($lead);
         }
     }
@@ -50,6 +64,7 @@ class LeadObserver
         ]);
 
         // Only process if status is email_confirmed and lead is not assigned
+        // In the updated() event, $lead->status already has the new value
         if ($lead->status === 'email_confirmed' && ! $lead->assigned_to) {
             // Ensure we have the necessary relationships loaded
             if (! $lead->relationLoaded('form')) {
@@ -110,37 +125,40 @@ class LeadObserver
                 ]);
 
                 try {
-                    $agent = $this->distributionService->distributeLead($lead);
+                    // Pass the call center directly to avoid refresh() in distributeLead
+                    $agent = $this->distributionService->distributeLead($lead, $callCenter);
 
                     if ($agent) {
                         Log::info('Observer: Agent found, assigning lead', [
                             'lead_id' => $lead->id,
                             'agent_id' => $agent->id,
                             'agent_name' => $agent->name,
+                            'lead_status' => $lead->status,
+                            'lead_assigned_to_before' => $lead->assigned_to,
                         ]);
 
-                        if ($this->distributionService->assignToAgent($lead, $agent)) {
-                            // Reload to get fresh data
-                            $lead->refresh();
-
-                            // Mark as pending call if still email_confirmed
-                            if ($lead->status === 'email_confirmed' && $lead->assigned_to) {
-                                $lead->withoutEvents(function () use ($lead) {
-                                    $lead->status = 'pending_call';
-                                    $lead->saveQuietly();
-                                });
-
-                                Log::info('Observer: Lead assigned and marked as pending_call', [
-                                    'lead_id' => $lead->id,
-                                    'agent_id' => $agent->id,
-                                ]);
-                            }
-                        } else {
-                            Log::warning('Observer: Failed to assign lead to agent', [
-                                'lead_id' => $lead->id,
-                                'agent_id' => $agent->id,
+                        // Assign the lead directly without going through assignToAgent to avoid refresh issues
+                        // Use DB::table to update directly to avoid any observer/event issues
+                        \DB::table('leads')
+                            ->where('id', $lead->id)
+                            ->update([
+                                'assigned_to' => $agent->id,
+                                'status' => 'pending_call',
+                                'updated_at' => now(),
                             ]);
-                        }
+                        
+                        // Reload the lead to get the updated values
+                        $lead->refresh();
+                        
+                        Log::info('Observer: Lead assigned and marked as pending_call', [
+                            'lead_id' => $lead->id,
+                            'agent_id' => $agent->id,
+                            'assigned_to' => $lead->assigned_to,
+                            'status' => $lead->status,
+                        ]);
+                        
+                        // Dispatch LeadAssigned event manually
+                        event(new LeadAssigned($lead, $agent));
                     } else {
                         Log::warning('Observer: No agent found for distribution', [
                             'lead_id' => $lead->id,

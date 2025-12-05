@@ -35,10 +35,14 @@ class AuthenticateApiToken
         // Update last used timestamp
         $apiToken->update(['last_used_at' => now()]);
 
-        // Set authenticated user
-        $request->setUserResolver(function () use ($apiToken) {
-            return $apiToken->user;
+        // Set authenticated user - ensure user is loaded
+        $user = $apiToken->user;
+        $request->setUserResolver(function () use ($user) {
+            return $user;
         });
+
+        // Also set it on Auth facade for compatibility
+        auth()->setUser($user);
 
         return $next($request);
     }

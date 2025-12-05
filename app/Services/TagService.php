@@ -65,18 +65,24 @@ class TagService
      */
     public function getPopularTags(?CallCenter $callCenter = null, int $limit = 10): Collection
     {
-        $query = Tag::query()
-            ->withCount('leads')
-            ->orderBy('leads_count', 'desc')
-            ->limit($limit);
+        $query = Tag::query();
 
         if ($callCenter) {
-            $query->whereHas('leads', function ($q) use ($callCenter) {
+            // Count only leads from this call center
+            $query->withCount(['leads' => function ($q) use ($callCenter) {
+                $q->where('call_center_id', $callCenter->id);
+            }])
+            ->whereHas('leads', function ($q) use ($callCenter) {
                 $q->where('call_center_id', $callCenter->id);
             });
+        } else {
+            // Count all leads
+            $query->withCount('leads');
         }
 
-        return $query->get();
+        return $query->orderBy('leads_count', 'desc')
+            ->limit($limit)
+            ->get();
     }
 
     /**

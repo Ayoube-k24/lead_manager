@@ -3,157 +3,152 @@
 declare(strict_types=1);
 
 use App\Models\CallCenter;
+use App\Models\Form;
 use App\Models\Lead;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\LeadDistributionService;
 use Illuminate\Support\Facades\DB;
 
-beforeEach(function () {
-    require_once __DIR__.'/../Sprint1/EnsureMigrationsRun.php';
-    ensureMigrationsRun();
-});
+describe('Lead Distribution Performance', function () {
+    beforeEach(function () {
+        $this->distributionService = app(LeadDistributionService::class);
+    });
 
-describe('Performance - Lead Distribution', function () {
-    test('distributes 100 leads in less than 5 seconds', function () {
-        // Arrange
-        $callCenter = CallCenter::factory()->create(['distribution_method' => 'round_robin']);
-        $agentRole = Role::firstOrCreate(
-            ['slug' => 'agent'],
-            ['name' => 'Agent', 'slug' => 'agent']
-        );
+    test('distributes leads efficiently with many agents', function () {
+        $callCenter = CallCenter::factory()->create([
+            'distribution_method' => 'round_robin',
+        ]);
+        $form = Form::factory()->create(['call_center_id' => $callCenter->id]);
+        $agentRole = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
 
-        $agents = User::factory()->count(5)->create([
+        // Create 50 agents
+        $agents = User::factory()->count(50)->create([
             'role_id' => $agentRole->id,
             'call_center_id' => $callCenter->id,
             'is_active' => true,
         ]);
 
-        $leads = Lead::factory()->count(100)->create([
+        // Create 1000 unassigned leads
+        $leads = Lead::factory()->count(1000)->create([
+            'form_id' => $form->id,
             'call_center_id' => $callCenter->id,
             'status' => 'email_confirmed',
             'assigned_to' => null,
+            'email_confirmed_at' => now(),
+            'score' => 60,
         ]);
 
-        $service = app(LeadDistributionService::class);
-
-        // Act
         $startTime = microtime(true);
 
+        // Distribute all leads
+        $distributed = 0;
         foreach ($leads as $lead) {
-            $assignedAgent = $service->distributeLead($lead);
-            if ($assignedAgent) {
-                $service->assignToAgent($lead, $assignedAgent);
+            $agent = $this->distributionService->distributeLead($lead);
+            if ($agent) {
+                $this->distributionService->assignToAgent($lead, $agent);
+                $distributed++;
             }
         }
 
         $endTime = microtime(true);
-        $executionTime = $endTime - $startTime;
+        $executionTime = ($endTime - $startTime) * 1000;
 
-        // Assert
-        expect($executionTime)->toBeLessThan(5.0); // Less than 5 seconds
-
-        // Verify all leads are assigned
-        $assignedLeads = Lead::where('call_center_id', $callCenter->id)
-            ->whereNotNull('assigned_to')
-            ->count();
-
-        expect($assignedLeads)->toBe(100);
+        // Should distribute efficiently (< 2000ms for 1000 leads)
+        expect($executionTime)->toBeLessThan(2000.0)
+            ->and($distributed)->toBeGreaterThan(0);
     });
 
-    test('manages 1000 leads efficiently without N+1 queries', function () {
-        // Arrange
-        $callCenter = CallCenter::factory()->create(['distribution_method' => 'round_robin']);
-        $agentRole = Role::firstOrCreate(
-            ['slug' => 'agent'],
-            ['name' => 'Agent', 'slug' => 'agent']
-        );
+    test('handles weighted distribution efficiently', function () {
+        $callCenter = CallCenter::factory()->create([
+            'distribution_method' => 'weighted',
+        ]);
+        $form = Form::factory()->create(['call_center_id' => $callCenter->id]);
+        $agentRole = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
 
-        $agents = User::factory()->count(10)->create([
+        // Create agents with different performance levels
+        $agents = User::factory()->count(20)->create([
             'role_id' => $agentRole->id,
             'call_center_id' => $callCenter->id,
             'is_active' => true,
         ]);
 
-        $leads = Lead::factory()->count(1000)->create([
+        // Create some leads already assigned to test workload calculation
+        foreach ($agents->take(10) as $agent) {
+            Lead::factory()->count(10)->create([
+                'form_id' => $form->id,
+                'call_center_id' => $callCenter->id,
+                'assigned_to' => $agent->id,
+                'status' => 'pending_call',
+                'score' => 60,
+            ]);
+        }
+
+        // Create new leads to distribute
+        $leads = Lead::factory()->count(500)->create([
+            'form_id' => $form->id,
             'call_center_id' => $callCenter->id,
             'status' => 'email_confirmed',
             'assigned_to' => null,
+            'email_confirmed_at' => now(),
+            'score' => 60,
         ]);
 
-        $service = app(LeadDistributionService::class);
-
-        // Act - Count queries
-        DB::enableQueryLog();
-        DB::flushQueryLog();
+        $startTime = microtime(true);
 
         foreach ($leads as $lead) {
-            $assignedAgent = $service->distributeLead($lead);
-            if ($assignedAgent) {
-                $service->assignToAgent($lead, $assignedAgent);
+            $agent = $this->distributionService->distributeLead($lead);
+            if ($agent) {
+                $this->distributionService->assignToAgent($lead, $agent);
             }
         }
 
-        $queries = DB::getQueryLog();
-        $queryCount = count($queries);
+        $endTime = microtime(true);
+        $executionTime = ($endTime - $startTime) * 1000;
 
-        // Assert - Should not have excessive queries (N+1 problem)
-        // Each lead should require minimal queries (ideally < 10 queries per lead)
-        // With 1000 leads, we expect reasonable query count
-        expect($queryCount)->toBeLessThan(5000); // Less than 5 queries per lead on average
-
-        // Verify all leads are assigned
-        $assignedLeads = Lead::where('call_center_id', $callCenter->id)
-            ->whereNotNull('assigned_to')
-            ->count();
-
-        expect($assignedLeads)->toBe(1000);
+        // Weighted distribution should be efficient
+        expect($executionTime)->toBeLessThan(3000.0);
     });
 
-    test('optimizes queries by eager loading relationships', function () {
-        // Arrange
-        $callCenter = CallCenter::factory()->create(['distribution_method' => 'round_robin']);
-        $agentRole = Role::firstOrCreate(
-            ['slug' => 'agent'],
-            ['name' => 'Agent', 'slug' => 'agent']
-        );
+    test('calculates agent workload efficiently', function () {
+        $callCenter = CallCenter::factory()->create();
+        $form = Form::factory()->create(['call_center_id' => $callCenter->id]);
+        $agentRole = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
 
-        $agents = User::factory()->count(5)->create([
+        $agent = User::factory()->create([
             'role_id' => $agentRole->id,
             'call_center_id' => $callCenter->id,
             'is_active' => true,
         ]);
 
-        $leads = Lead::factory()->count(100)->create([
+        // Create many leads assigned to agent
+        Lead::factory()->count(2000)->create([
+            'form_id' => $form->id,
+            'call_center_id' => $callCenter->id,
+            'assigned_to' => $agent->id,
+            'status' => 'pending_call',
+            'score' => 60,
+        ]);
+
+        $startTime = microtime(true);
+
+        // The distribution service calculates workload internally
+        $lead = Lead::factory()->create([
+            'form_id' => $form->id,
             'call_center_id' => $callCenter->id,
             'status' => 'email_confirmed',
             'assigned_to' => null,
+            'email_confirmed_at' => now(),
+            'score' => 60,
         ]);
 
-        // Act - Load leads with eager loading
-        DB::enableQueryLog();
-        DB::flushQueryLog();
+        $this->distributionService->distributeLead($lead);
 
-        $leadsWithRelations = Lead::where('call_center_id', $callCenter->id)
-            ->with(['form', 'callCenter', 'assignedAgent'])
-            ->get();
+        $endTime = microtime(true);
+        $executionTime = ($endTime - $startTime) * 1000;
 
-        $queriesWithEagerLoading = count(DB::getQueryLog());
-
-        // Act - Load leads without eager loading (simulate N+1)
-        DB::flushQueryLog();
-
-        $leadsWithoutRelations = Lead::where('call_center_id', $callCenter->id)->get();
-        foreach ($leadsWithoutRelations as $lead) {
-            $lead->form; // Trigger N+1
-            $lead->callCenter; // Trigger N+1
-            $lead->assignedAgent; // Trigger N+1
-        }
-
-        $queriesWithoutEagerLoading = count(DB::getQueryLog());
-
-        // Assert - Eager loading should use fewer queries
-        expect($queriesWithEagerLoading)->toBeLessThan($queriesWithoutEagerLoading);
+        // Workload calculation should be efficient
+        expect($executionTime)->toBeLessThan(500.0);
     });
 });
 

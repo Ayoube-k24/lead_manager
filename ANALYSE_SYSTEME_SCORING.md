@@ -254,3 +254,4 @@ try {
 **Conclusion** : Le système de scoring a plusieurs problèmes qui peuvent empêcher son bon fonctionnement. Les corrections doivent être appliquées en priorité.
 
 
+

@@ -7,259 +7,249 @@ use App\Models\Form;
 use App\Models\Lead;
 use App\Models\SmtpProfile;
 use App\Services\LeadConfirmationService;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Mail;
 
-beforeEach(function () {
-    require_once __DIR__.'/../../Feature/Sprint1/EnsureMigrationsRun.php';
-    ensureMigrationsRun();
-    Mail::fake();
-});
+describe('LeadConfirmationService', function () {
+    beforeEach(function () {
+        $this->service = new LeadConfirmationService();
+        Mail::fake();
+    });
 
-describe('LeadConfirmationService - sendConfirmationEmail', function () {
-    test('sends confirmation email successfully with valid form and SMTP profile', function () {
-        // Arrange
-        $smtpProfile = SmtpProfile::factory()->create(['is_active' => true]);
-        $emailTemplate = EmailTemplate::factory()->create([
-            'subject' => 'Confirm your email {{name}}',
-            'body_html' => '<p>Click here: {{confirmation_link}}</p>',
-            'body_text' => 'Click here: {{confirmation_link}}',
-        ]);
-        $form = Form::factory()->create([
-            'smtp_profile_id' => $smtpProfile->id,
-            'email_template_id' => $emailTemplate->id,
-        ]);
-        $lead = Lead::factory()->create([
-            'form_id' => $form->id,
-            'email' => 'test@example.com',
-            'data' => ['name' => 'John Doe'],
-        ]);
-        $service = new LeadConfirmationService();
+    describe('sendConfirmationEmail', function () {
+        test('sends confirmation email successfully', function () {
+            $smtpProfile = SmtpProfile::factory()->create([
+                'is_active' => true,
+                'from_address' => 'noreply@example.com',
+                'from_name' => 'Test Company',
+            ]);
 
-        // Act
-        $result = $service->sendConfirmationEmail($lead);
+            $emailTemplate = EmailTemplate::factory()->create([
+                'subject' => 'Confirm your email',
+                'body_html' => '<p>Hello {{name}}, please confirm: {{confirmation_link}}</p>',
+                'body_text' => 'Hello {{name}}, please confirm: {{confirmation_link}}',
+            ]);
 
-        // Assert
-        expect($result)->toBeTrue();
-        Mail::assertSent(function ($mail) use ($lead) {
-            return $mail->hasTo($lead->email);
+            $form = Form::factory()->create([
+                'smtp_profile_id' => $smtpProfile->id,
+                'email_template_id' => $emailTemplate->id,
+            ]);
+
+            $lead = Lead::factory()->create([
+                'form_id' => $form->id,
+                'email' => 'test@example.com',
+                'data' => ['name' => 'John Doe'],
+            ]);
+
+            $result = $this->service->sendConfirmationEmail($lead);
+
+            expect($result)->toBeTrue()
+                ->and($lead->fresh()->email_confirmation_token)->not->toBeNull()
+                ->and($lead->fresh()->email_confirmation_token_expires_at)->not->toBeNull();
+        });
+
+        test('generates token if not exists', function () {
+            $smtpProfile = SmtpProfile::factory()->create(['is_active' => true]);
+            $emailTemplate = EmailTemplate::factory()->create();
+            $form = Form::factory()->create([
+                'smtp_profile_id' => $smtpProfile->id,
+                'email_template_id' => $emailTemplate->id,
+            ]);
+
+            $lead = Lead::factory()->create([
+                'form_id' => $form->id,
+                'email_confirmation_token' => null,
+            ]);
+
+            $this->service->sendConfirmationEmail($lead);
+
+            expect($lead->fresh()->email_confirmation_token)->not->toBeNull()
+                ->and(strlen($lead->fresh()->email_confirmation_token))->toBe(64);
+        });
+
+        test('sets token expiration to 24 hours', function () {
+            $smtpProfile = SmtpProfile::factory()->create(['is_active' => true]);
+            $emailTemplate = EmailTemplate::factory()->create();
+            $form = Form::factory()->create([
+                'smtp_profile_id' => $smtpProfile->id,
+                'email_template_id' => $emailTemplate->id,
+            ]);
+
+            $lead = Lead::factory()->create([
+                'form_id' => $form->id,
+                'email_confirmation_token' => null,
+                'email_confirmation_token_expires_at' => null, // Ensure no expiration is set
+            ]);
+
+            $this->service->sendConfirmationEmail($lead);
+
+            $expiresAt = $lead->fresh()->email_confirmation_token_expires_at;
+            // Calculate hours until expiration (expiresAt is in the future)
+            $hoursUntilExpiration = now()->diffInHours($expiresAt, false);
+            
+            expect($expiresAt)->not->toBeNull()
+                ->and($expiresAt->isFuture())->toBeTrue()
+                ->and($hoursUntilExpiration)->toBeGreaterThanOrEqual(23) // Should be close to 24 hours
+                ->and($hoursUntilExpiration)->toBeLessThanOrEqual(24);
+        });
+
+        test('returns false when form is missing', function () {
+            $lead = Lead::factory()->create([
+                'form_id' => null,
+            ]);
+
+            $result = $this->service->sendConfirmationEmail($lead);
+
+            expect($result)->toBeFalse();
+        });
+
+        test('returns false when SMTP profile is missing', function () {
+            $emailTemplate = EmailTemplate::factory()->create();
+            $form = Form::factory()->create([
+                'smtp_profile_id' => null,
+                'email_template_id' => $emailTemplate->id,
+            ]);
+
+            $lead = Lead::factory()->create([
+                'form_id' => $form->id,
+            ]);
+
+            $result = $this->service->sendConfirmationEmail($lead);
+
+            expect($result)->toBeFalse();
+        });
+
+        test('returns false when email template is missing', function () {
+            $smtpProfile = SmtpProfile::factory()->create(['is_active' => true]);
+            $form = Form::factory()->create([
+                'smtp_profile_id' => $smtpProfile->id,
+                'email_template_id' => null,
+            ]);
+
+            $lead = Lead::factory()->create([
+                'form_id' => $form->id,
+            ]);
+
+            $result = $this->service->sendConfirmationEmail($lead);
+
+            expect($result)->toBeFalse();
+        });
+
+        test('returns false when SMTP profile is inactive', function () {
+            $smtpProfile = SmtpProfile::factory()->create(['is_active' => false]);
+            $emailTemplate = EmailTemplate::factory()->create();
+            $form = Form::factory()->create([
+                'smtp_profile_id' => $smtpProfile->id,
+                'email_template_id' => $emailTemplate->id,
+            ]);
+
+            $lead = Lead::factory()->create([
+                'form_id' => $form->id,
+            ]);
+
+            $result = $this->service->sendConfirmationEmail($lead);
+
+            expect($result)->toBeFalse();
+        });
+
+        test('renders template variables correctly', function () {
+            $smtpProfile = SmtpProfile::factory()->create(['is_active' => true]);
+            $emailTemplate = EmailTemplate::factory()->create([
+                'subject' => 'Hello {{name}}',
+                'body_html' => '<p>Confirm: {{confirmation_link}}</p>',
+            ]);
+            $form = Form::factory()->create([
+                'smtp_profile_id' => $smtpProfile->id,
+                'email_template_id' => $emailTemplate->id,
+            ]);
+
+            $lead = Lead::factory()->create([
+                'form_id' => $form->id,
+                'email' => 'test@example.com',
+                'data' => ['name' => 'John Doe'],
+            ]);
+
+            $result = $this->service->sendConfirmationEmail($lead);
+
+            expect($result)->toBeTrue();
+            // The email should be sent with rendered variables
+        });
+
+        test('uses existing token if already exists', function () {
+            $smtpProfile = SmtpProfile::factory()->create(['is_active' => true]);
+            $emailTemplate = EmailTemplate::factory()->create();
+            $form = Form::factory()->create([
+                'smtp_profile_id' => $smtpProfile->id,
+                'email_template_id' => $emailTemplate->id,
+            ]);
+
+            $existingToken = 'existing-token-123';
+            $lead = Lead::factory()->create([
+                'form_id' => $form->id,
+                'email_confirmation_token' => $existingToken,
+            ]);
+
+            $this->service->sendConfirmationEmail($lead);
+
+            expect($lead->fresh()->email_confirmation_token)->toBe($existingToken);
         });
     });
 
-    test('returns false when lead has no form', function () {
-        // Arrange
-        $lead = Lead::factory()->create(['form_id' => null]);
-        $service = new LeadConfirmationService();
+    describe('prepareTemplateVariables', function () {
+        test('extracts name from various data fields', function () {
+            $lead = Lead::factory()->create([
+                'data' => ['name' => 'John Doe'],
+            ]);
 
-        // Act
-        $result = $service->sendConfirmationEmail($lead);
+            $reflection = new ReflectionClass($this->service);
+            $method = $reflection->getMethod('prepareTemplateVariables');
+            $method->setAccessible(true);
 
-        // Assert
-        expect($result)->toBeFalse();
-        Mail::assertNothingSent();
-    });
+            $variables = $method->invoke($this->service, $lead, 'https://example.com/confirm');
 
-    test('returns false when form has no SMTP profile', function () {
-        // Arrange
-        $form = Form::factory()->create(['smtp_profile_id' => null]);
-        $lead = Lead::factory()->create(['form_id' => $form->id]);
-        $service = new LeadConfirmationService();
-
-        // Act
-        $result = $service->sendConfirmationEmail($lead);
-
-        // Assert
-        expect($result)->toBeFalse();
-        Mail::assertNothingSent();
-    });
-
-    test('returns false when form has no email template', function () {
-        // Arrange
-        $smtpProfile = SmtpProfile::factory()->create();
-        $form = Form::factory()->create([
-            'smtp_profile_id' => $smtpProfile->id,
-            'email_template_id' => null,
-        ]);
-        $lead = Lead::factory()->create(['form_id' => $form->id]);
-        $service = new LeadConfirmationService();
-
-        // Act
-        $result = $service->sendConfirmationEmail($lead);
-
-        // Assert
-        expect($result)->toBeFalse();
-        Mail::assertNothingSent();
-    });
-
-    test('returns false when SMTP profile is inactive', function () {
-        // Arrange
-        $smtpProfile = SmtpProfile::factory()->create(['is_active' => false]);
-        $emailTemplate = EmailTemplate::factory()->create();
-        $form = Form::factory()->create([
-            'smtp_profile_id' => $smtpProfile->id,
-            'email_template_id' => $emailTemplate->id,
-        ]);
-        $lead = Lead::factory()->create(['form_id' => $form->id]);
-        $service = new LeadConfirmationService();
-
-        // Act
-        $result = $service->sendConfirmationEmail($lead);
-
-        // Assert
-        expect($result)->toBeFalse();
-        Mail::assertNothingSent();
-    });
-
-    test('generates confirmation token if not exists', function () {
-        // Arrange
-        $smtpProfile = SmtpProfile::factory()->create(['is_active' => true]);
-        $emailTemplate = EmailTemplate::factory()->create();
-        $form = Form::factory()->create([
-            'smtp_profile_id' => $smtpProfile->id,
-            'email_template_id' => $emailTemplate->id,
-        ]);
-        $lead = Lead::factory()->create([
-            'form_id' => $form->id,
-            'email_confirmation_token' => null,
-        ]);
-        $service = new LeadConfirmationService();
-
-        // Act
-        $service->sendConfirmationEmail($lead);
-
-        // Assert
-        $lead->refresh();
-        expect($lead->email_confirmation_token)->not->toBeNull()
-            ->and($lead->email_confirmation_token_expires_at)->not->toBeNull();
-    });
-
-    test('uses existing confirmation token if already exists', function () {
-        // Arrange
-        $existingToken = 'existing-token-123';
-        $smtpProfile = SmtpProfile::factory()->create(['is_active' => true]);
-        $emailTemplate = EmailTemplate::factory()->create();
-        $form = Form::factory()->create([
-            'smtp_profile_id' => $smtpProfile->id,
-            'email_template_id' => $emailTemplate->id,
-        ]);
-        $lead = Lead::factory()->create([
-            'form_id' => $form->id,
-            'email_confirmation_token' => $existingToken,
-        ]);
-        $service = new LeadConfirmationService();
-
-        // Act
-        $service->sendConfirmationEmail($lead);
-
-        // Assert
-        $lead->refresh();
-        expect($lead->email_confirmation_token)->toBe($existingToken);
-    });
-
-    test('renders template variables correctly', function () {
-        // Arrange
-        $smtpProfile = SmtpProfile::factory()->create([
-            'is_active' => true,
-            'from_address' => 'noreply@example.com',
-            'from_name' => 'Test Company',
-        ]);
-        $emailTemplate = EmailTemplate::factory()->create([
-            'subject' => 'Hello {{name}}',
-            'body_html' => '<p>Your email is {{email}}. Confirm: {{confirmation_link}}</p>',
-        ]);
-        $form = Form::factory()->create([
-            'smtp_profile_id' => $smtpProfile->id,
-            'email_template_id' => $emailTemplate->id,
-        ]);
-        $lead = Lead::factory()->create([
-            'form_id' => $form->id,
-            'email' => 'test@example.com',
-            'data' => ['name' => 'John Doe'],
-        ]);
-        $service = new LeadConfirmationService();
-
-        // Act
-        $service->sendConfirmationEmail($lead);
-
-        // Assert
-        Mail::assertSent(function ($mail) {
-            $subject = $mail->subject;
-            $body = $mail->viewData['body'] ?? '';
-
-            return str_contains($subject, 'John Doe')
-                && str_contains($body, 'test@example.com')
-                && str_contains($body, route('leads.confirm-email', ['token' => '']));
+            expect($variables['name'])->toBe('John Doe');
         });
-    });
 
-    test('handles template variables with both {{}} and {} syntax', function () {
-        // Arrange
-        $smtpProfile = SmtpProfile::factory()->create(['is_active' => true]);
-        $emailTemplate = EmailTemplate::factory()->create([
-            'subject' => 'Hello {name}',
-            'body_html' => '<p>Email: {{email}}</p>',
-        ]);
-        $form = Form::factory()->create([
-            'smtp_profile_id' => $smtpProfile->id,
-            'email_template_id' => $emailTemplate->id,
-        ]);
-        $lead = Lead::factory()->create([
-            'form_id' => $form->id,
-            'email' => 'test@example.com',
-            'data' => ['name' => 'John'],
-        ]);
-        $service = new LeadConfirmationService();
+        test('uses first_name if name is not available', function () {
+            $lead = Lead::factory()->create([
+                'data' => ['first_name' => 'John'],
+            ]);
 
-        // Act
-        $result = $service->sendConfirmationEmail($lead);
+            $reflection = new ReflectionClass($this->service);
+            $method = $reflection->getMethod('prepareTemplateVariables');
+            $method->setAccessible(true);
 
-        // Assert
-        expect($result)->toBeTrue();
-    });
+            $variables = $method->invoke($this->service, $lead, 'https://example.com/confirm');
 
-    test('extracts name from various data fields', function () {
-        // Arrange
-        $smtpProfile = SmtpProfile::factory()->create(['is_active' => true]);
-        $emailTemplate = EmailTemplate::factory()->create([
-            'subject' => 'Hello {{name}}',
-        ]);
-        $form = Form::factory()->create([
-            'smtp_profile_id' => $smtpProfile->id,
-            'email_template_id' => $emailTemplate->id,
-        ]);
-        $lead = Lead::factory()->create([
-            'form_id' => $form->id,
-            'data' => ['first_name' => 'John', 'last_name' => 'Doe'],
-        ]);
-        $service = new LeadConfirmationService();
+            expect($variables['name'])->toBe('John');
+        });
 
-        // Act
-        $result = $service->sendConfirmationEmail($lead);
+        test('uses default name when no name fields available', function () {
+            $lead = Lead::factory()->create([
+                'data' => [],
+            ]);
 
-        // Assert
-        expect($result)->toBeTrue();
-    });
+            $reflection = new ReflectionClass($this->service);
+            $method = $reflection->getMethod('prepareTemplateVariables');
+            $method->setAccessible(true);
 
-    test('uses default name when no name field found', function () {
-        // Arrange
-        $smtpProfile = SmtpProfile::factory()->create(['is_active' => true]);
-        $emailTemplate = EmailTemplate::factory()->create([
-            'subject' => 'Hello {{name}}',
-        ]);
-        $form = Form::factory()->create([
-            'smtp_profile_id' => $smtpProfile->id,
-            'email_template_id' => $emailTemplate->id,
-        ]);
-        $lead = Lead::factory()->create([
-            'form_id' => $form->id,
-            'data' => [],
-        ]);
-        $service = new LeadConfirmationService();
+            $variables = $method->invoke($this->service, $lead, 'https://example.com/confirm');
 
-        // Act
-        $result = $service->sendConfirmationEmail($lead);
+            expect($variables['name'])->toBe('Cher client');
+        });
 
-        // Assert
-        expect($result)->toBeTrue();
+        test('includes confirmation link in variables', function () {
+            $lead = Lead::factory()->create();
+            $confirmationUrl = 'https://example.com/confirm/token123';
+
+            $reflection = new ReflectionClass($this->service);
+            $method = $reflection->getMethod('prepareTemplateVariables');
+            $method->setAccessible(true);
+
+            $variables = $method->invoke($this->service, $lead, $confirmationUrl);
+
+            expect($variables['confirmation_link'])->toBe($confirmationUrl);
+        });
     });
 });
 

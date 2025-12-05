@@ -10,6 +10,7 @@ new class extends Component {
     use WithPagination;
 
     public bool $showCreateModal = false;
+    public bool $showGuide = false;
     public string $alertName = '';
     public string $alertType = 'lead_stale';
     public array $alertConditions = [];
@@ -32,6 +33,11 @@ new class extends Component {
     {
         $this->showCreateModal = false;
         $this->resetAlertForm();
+    }
+
+    public function toggleGuide(): void
+    {
+        $this->showGuide = ! $this->showGuide;
     }
 
     public function resetAlertForm(): void
@@ -134,10 +140,212 @@ new class extends Component {
             <h1 class="text-2xl font-bold">{{ __('Alertes') }}</h1>
             <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">{{ __('Configurez des alertes pour être notifié des événements importants') }}</p>
         </div>
-        <flux:button wire:click="openCreateModal" variant="primary" icon="plus">
-            {{ __('Nouvelle alerte') }}
-        </flux:button>
+        <div class="flex items-center gap-3">
+            <flux:button wire:click="toggleGuide" variant="ghost" icon="question-mark-circle">
+                {{ $showGuide ? __('Masquer le guide') : __('Afficher le guide') }}
+            </flux:button>
+            <flux:button wire:click="openCreateModal" variant="primary" icon="plus">
+                {{ __('Nouvelle alerte') }}
+            </flux:button>
+        </div>
     </div>
+
+    <!-- Guide visuel -->
+    @if ($showGuide)
+        <div class="rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
+            <div class="border-b border-neutral-200 p-6 dark:border-neutral-700">
+                <h2 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{{ __('Guide des alertes') }}</h2>
+                <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">{{ __('Apprenez à créer et configurer des alertes efficacement') }}</p>
+            </div>
+
+            <div class="divide-y divide-neutral-200 dark:divide-neutral-700">
+                <!-- Comment créer une alerte -->
+                <div class="p-6">
+                    <h3 class="text-base font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
+                        📝 {{ __('Comment créer une alerte') }}
+                    </h3>
+                    <ol class="list-decimal list-inside space-y-2 text-sm text-neutral-600 dark:text-neutral-400">
+                        <li>{{ __('Cliquez sur "Nouvelle alerte" en haut à droite') }}</li>
+                        <li>{{ __('Donnez un nom descriptif à votre alerte (ex: "Leads inactifs depuis 24h")') }}</li>
+                        <li>{{ __('Sélectionnez le type d\'alerte approprié') }}</li>
+                        <li>{{ __('Définissez un seuil si nécessaire (nombre ou pourcentage)') }}</li>
+                        <li>{{ __('Choisissez les canaux de notification (in-app et/ou email)') }}</li>
+                        <li>{{ __('Cliquez sur "Créer"') }}</li>
+                    </ol>
+                </div>
+
+                <!-- Types d'alertes -->
+                <div class="p-6">
+                    <h3 class="text-base font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
+                        🔔 {{ __('Types d\'alertes disponibles') }}
+                    </h3>
+                    <div class="space-y-4">
+                        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                            <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('Lead inactif') }}</div>
+                            <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-2">{{ __('Détecte les leads qui n\'ont pas été mis à jour depuis X heures') }}</p>
+                            <div class="text-xs text-neutral-500 dark:text-neutral-500">
+                                <strong>{{ __('Exemple :') }}</strong> {{ __('Seuil: 10, Conditions: 24h → Alerte si 10+ leads inactifs depuis 24h') }}
+                            </div>
+                        </div>
+
+                        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                            <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('Performance agent') }}</div>
+                            <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-2">{{ __('Surveille le taux de conversion d\'un agent spécifique') }}</p>
+                            <div class="text-xs text-neutral-500 dark:text-neutral-500">
+                                <strong>{{ __('Exemple :') }}</strong> {{ __('Seuil: 40%, Agent: #5 → Alerte si taux < 40%') }}
+                            </div>
+                        </div>
+
+                        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                            <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('Taux de conversion') }}</div>
+                            <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-2">{{ __('Surveille le taux de conversion global de tous les leads') }}</p>
+                            <div class="text-xs text-neutral-500 dark:text-neutral-500">
+                                <strong>{{ __('Exemple :') }}</strong> {{ __('Seuil: 30% → Alerte si taux global < 30%') }}
+                            </div>
+                        </div>
+
+                        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                            <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('Volume élevé') }}</div>
+                            <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-2">{{ __('Détecte quand trop de leads arrivent dans un laps de temps') }}</p>
+                            <div class="text-xs text-neutral-500 dark:text-neutral-500">
+                                <strong>{{ __('Exemple :') }}</strong> {{ __('Seuil: 50, Période: 1h → Alerte si 50+ leads en 1h') }}
+                            </div>
+                        </div>
+
+                        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                            <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('Volume faible') }}</div>
+                            <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-2">{{ __('Détecte quand trop peu de leads arrivent dans un laps de temps') }}</p>
+                            <div class="text-xs text-neutral-500 dark:text-neutral-500">
+                                <strong>{{ __('Exemple :') }}</strong> {{ __('Seuil: 5, Période: 2h → Alerte si < 5 leads en 2h') }}
+                            </div>
+                        </div>
+
+                        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                            <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('Performance formulaire') }}</div>
+                            <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-2">{{ __('Surveille le taux de conversion d\'un formulaire spécifique') }}</p>
+                            <div class="text-xs text-neutral-500 dark:text-neutral-500">
+                                <strong>{{ __('Exemple :') }}</strong> {{ __('Seuil: 20%, Formulaire: #3 → Alerte si taux < 20%') }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fonctionnement -->
+                <div class="p-6">
+                    <h3 class="text-base font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
+                        ⚙️ {{ __('Comment ça fonctionne') }}
+                    </h3>
+                    <div class="space-y-3 text-sm text-neutral-600 dark:text-neutral-400">
+                        <div class="flex items-start gap-3">
+                            <span class="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-xs font-semibold text-blue-600 dark:text-blue-400">1</span>
+                            <div>
+                                <strong class="text-neutral-900 dark:text-neutral-100">{{ __('Vérification automatique') }}</strong>
+                                <p>{{ __('Le système vérifie toutes les alertes actives toutes les 15 minutes') }}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-xs font-semibold text-blue-600 dark:text-blue-400">2</span>
+                            <div>
+                                <strong class="text-neutral-900 dark:text-neutral-100">{{ __('Évaluation des conditions') }}</strong>
+                                <p>{{ __('Pour chaque alerte, le système vérifie si les conditions sont remplies') }}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-xs font-semibold text-blue-600 dark:text-blue-400">3</span>
+                            <div>
+                                <strong class="text-neutral-900 dark:text-neutral-100">{{ __('Déclenchement') }}</strong>
+                                <p>{{ __('Si les conditions sont remplies, l\'alerte est déclenchée et les notifications sont envoyées') }}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-xs font-semibold text-blue-600 dark:text-blue-400">4</span>
+                            <div>
+                                <strong class="text-neutral-900 dark:text-neutral-100">{{ __('Cooldown') }}</strong>
+                                <p>{{ __('L\'alerte ne peut pas être déclenchée à nouveau pendant 60 minutes (pour éviter le spam)') }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Canaux de notification -->
+                <div class="p-6">
+                    <h3 class="text-base font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
+                        📱 {{ __('Canaux de notification') }}
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20">
+                            <div class="font-semibold text-green-900 dark:text-green-100 mb-1">{{ __('Notification in-app') }}</div>
+                            <p class="text-sm text-green-700 dark:text-green-300">{{ __('Visible dans l\'interface Lead Manager. Pas de configuration supplémentaire nécessaire.') }}</p>
+                        </div>
+                        <div class="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
+                            <div class="font-semibold text-blue-900 dark:text-blue-100 mb-1">{{ __('Email') }}</div>
+                            <p class="text-sm text-blue-700 dark:text-blue-300">{{ __('Reçue même si vous n\'êtes pas connecté. Vérifiez votre dossier spam si nécessaire.') }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Exemples pratiques -->
+                <div class="p-6">
+                    <h3 class="text-base font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
+                        💡 {{ __('Exemples pratiques') }}
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                            <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-2">{{ __('Exemple 1 : Surveiller les leads inactifs') }}</div>
+                            <div class="text-sm text-neutral-600 dark:text-neutral-400 space-y-1">
+                                <p><strong>{{ __('Nom :') }}</strong> Leads inactifs depuis 24h</p>
+                                <p><strong>{{ __('Type :') }}</strong> Lead inactif</p>
+                                <p><strong>{{ __('Seuil :') }}</strong> 10</p>
+                                <p><strong>{{ __('Canaux :') }}</strong> In-app + Email</p>
+                                <p class="mt-2 text-xs italic">{{ __('Résultat : Notification si 10+ leads n\'ont pas été mis à jour depuis 24h') }}</p>
+                            </div>
+                        </div>
+
+                        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                            <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-2">{{ __('Exemple 2 : Détecter un pic de volume') }}</div>
+                            <div class="text-sm text-neutral-600 dark:text-neutral-400 space-y-1">
+                                <p><strong>{{ __('Nom :') }}</strong> Pic de volume de leads</p>
+                                <p><strong>{{ __('Type :') }}</strong> Volume élevé</p>
+                                <p><strong>{{ __('Seuil :') }}</strong> 50</p>
+                                <p><strong>{{ __('Canaux :') }}</strong> In-app</p>
+                                <p class="mt-2 text-xs italic">{{ __('Résultat : Notification si 50+ leads créés dans la dernière heure') }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Problèmes courants -->
+                <div class="p-6">
+                    <h3 class="text-base font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
+                        🔧 {{ __('Résolution des problèmes') }}
+                    </h3>
+                    <div class="space-y-3 text-sm">
+                        <div class="flex items-start gap-3">
+                            <span class="text-red-500 dark:text-red-400">⚠️</span>
+                            <div>
+                                <strong class="text-neutral-900 dark:text-neutral-100">{{ __('L\'alerte ne se déclenche jamais') }}</strong>
+                                <p class="text-neutral-600 dark:text-neutral-400 mt-1">{{ __('Vérifiez que l\'alerte est active, que le seuil n\'est pas trop élevé, et que les conditions sont réalistes.') }}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="text-yellow-500 dark:text-yellow-400">⚠️</span>
+                            <div>
+                                <strong class="text-neutral-900 dark:text-neutral-100">{{ __('Trop de notifications') }}</strong>
+                                <p class="text-neutral-600 dark:text-neutral-400 mt-1">{{ __('Augmentez le seuil ou ajustez les conditions pour être plus strict. Le cooldown limite déjà à 1 déclenchement par heure.') }}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="text-blue-500 dark:text-blue-400">⚠️</span>
+                            <div>
+                                <strong class="text-neutral-900 dark:text-neutral-100">{{ __('Pas d\'email reçu') }}</strong>
+                                <p class="text-neutral-600 dark:text-neutral-400 mt-1">{{ __('Vérifiez votre email dans le profil, le dossier spam, et que le canal email est sélectionné.') }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 
     <!-- Messages flash -->
     @if (session('message'))

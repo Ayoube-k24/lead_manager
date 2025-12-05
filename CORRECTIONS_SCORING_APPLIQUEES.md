@@ -177,3 +177,4 @@ php artisan leads:recalculate-scores
 **Conclusion** : Les corrections principales ont été appliquées. Le système de scoring devrait maintenant fonctionner correctement. Il reste à tester et à vérifier que tout fonctionne comme prévu.
 
 
+

@@ -73,7 +73,7 @@ class LeadScoringService
         ];
 
         // Ensure score is between 0 and 100
-        $score = max(0, min(100, round($score)));
+        $score = (int) max(0, min(100, round($score)));
 
         return [
             'score' => $score,
@@ -133,7 +133,14 @@ class LeadScoringService
             return 0; // No confirmation = 0
         }
 
-        $confirmationTime = $lead->created_at->diffInHours($lead->email_confirmed_at);
+        // Calculate hours between creation and confirmation
+        // email_confirmed_at should be after created_at
+        $confirmationTime = $lead->created_at->diffInHours($lead->email_confirmed_at, false);
+
+        // If negative (shouldn't happen but handle it), return 0
+        if ($confirmationTime < 0) {
+            return 0;
+        }
 
         if ($confirmationTime < 1) {
             return 100; // Confirmed within 1 hour

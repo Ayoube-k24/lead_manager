@@ -75,16 +75,28 @@ class ApiTokenController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Request $request, ApiToken $apiToken): JsonResponse
+    public function destroy(Request $request, int $apiToken): JsonResponse
     {
-        // Check ownership
-        if ($apiToken->user_id !== $request->user()->id) {
+        // Find the token manually to avoid model binding issues
+        $apiTokenModel = ApiToken::find($apiToken);
+
+        if (! $apiTokenModel) {
             return response()->json([
                 'message' => 'Token non trouvé',
             ], 404);
         }
 
-        $apiToken->delete();
+        // Get user from request - try multiple methods for compatibility
+        $user = $request->user() ?? auth()->user();
+
+        // Check ownership
+        if (! $user || $apiTokenModel->user_id !== $user->id) {
+            return response()->json([
+                'message' => 'Token non trouvé',
+            ], 404);
+        }
+
+        $apiTokenModel->delete();
 
         return response()->json([
             'message' => 'Token supprimé avec succès',
