@@ -101,11 +101,19 @@ class PublicFormController extends Controller
         // Dispatch LeadCreated event for webhooks
         event(new LeadCreated($lead));
 
-        // Dispatch confirmation email job to queue
-        // The email will be sent asynchronously and will retry automatically if SMTP fails
-        SendLeadConfirmationEmail::dispatch($lead);
+        // Try to send email immediately if SMTP is valid, otherwise queue it
+        $confirmationService = app(\App\Services\LeadConfirmationService::class);
+        $emailSent = $confirmationService->sendConfirmationEmail($lead);
 
-        \Log::info('Confirmation email job dispatched', ['lead_id' => $lead->id]);
+        if (! $emailSent) {
+            // If immediate send failed, dispatch to queue for retry
+            SendLeadConfirmationEmail::dispatch($lead);
+            \Log::warning('Confirmation email failed to send immediately, queued for retry', [
+                'lead_id' => $lead->id,
+            ]);
+        } else {
+            \Log::info('Confirmation email sent immediately', ['lead_id' => $lead->id]);
+        }
 
         // Log successful submission
         \Log::info('Form submitted successfully', [

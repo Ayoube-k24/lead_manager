@@ -70,20 +70,34 @@ class SendLeadConfirmationEmail implements ShouldQueue
         }
 
         // Envoyer l'email de confirmation
+        // This job is used as a fallback when immediate sending fails
         $emailSent = $confirmationService->sendConfirmationEmail($this->lead);
 
         if (! $emailSent) {
             Log::error('Failed to send confirmation email in job', [
                 'lead_id' => $this->lead->id,
                 'attempt' => $this->attempts(),
+                'max_attempts' => $this->tries,
             ]);
 
             // Relancer une exception pour que Laravel réessaie le job
-            throw new \Exception('Failed to send confirmation email');
+            // Only retry if we haven't exceeded max attempts
+            if ($this->attempts() < $this->tries) {
+                throw new \Exception('Failed to send confirmation email');
+            }
+
+            // If max attempts reached, log and stop
+            Log::error('Confirmation email job failed after all retries', [
+                'lead_id' => $this->lead->id,
+                'total_attempts' => $this->attempts(),
+            ]);
+
+            return;
         }
 
-        Log::info('Confirmation email sent successfully', [
+        Log::info('Confirmation email sent successfully via queue job', [
             'lead_id' => $this->lead->id,
+            'attempt' => $this->attempts(),
         ]);
     }
 

@@ -41,6 +41,8 @@ Plateforme complète de gestion et de confirmation des leads avec validation dou
 
 ## Installation rapide
 
+⚠️ **IMPORTANT** : Cette application utilise des **Queues**, **Observers**, et **Listeners**. Consultez le [Guide d'Installation Complet](INSTALLATION.md) pour une configuration correcte.
+
 ```bash
 # Cloner le dépôt
 git clone <repository-url>
@@ -61,9 +63,20 @@ php artisan db:seed
 # Compiler les assets
 npm run build
 
+# ⚠️ CRITIQUE : Configurer les queues (voir INSTALLATION.md)
+# Les emails de confirmation nécessitent un worker de queue actif
+
 # Démarrer le serveur
 php artisan serve
 ```
+
+### ⚠️ Configuration requise pour les emails
+
+**Les emails de confirmation ne seront PAS envoyés automatiquement sans :**
+1. Un worker de queue actif (Supervisor, Service Windows, ou Systemd)
+2. Le scheduler Laravel configuré (cron)
+
+**Consultez [INSTALLATION.md](INSTALLATION.md) pour la configuration complète.**
 
 ## Rôles
 

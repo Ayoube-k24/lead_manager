@@ -7,6 +7,7 @@ use App\Models\Lead;
 use App\Models\SmtpProfile;
 use Illuminate\Mail\Mailer;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
@@ -66,6 +67,11 @@ class LeadConfirmationService
         $mailer = $this->configureMailer($smtpProfile);
 
         try {
+            // Set a shorter timeout for immediate sending (5 seconds)
+            // This prevents blocking if SMTP is slow or unreachable
+            $originalTimeout = ini_get('default_socket_timeout');
+            ini_set('default_socket_timeout', 5);
+
             $mailer->raw($bodyText, function ($message) use ($lead, $smtpProfile, $subject, $bodyHtml) {
                 $message->to($lead->email)
                     ->subject($subject)
@@ -73,11 +79,24 @@ class LeadConfirmationService
                     ->html($bodyHtml);
             });
 
+            // Restore original timeout
+            ini_set('default_socket_timeout', $originalTimeout);
+
+            Log::info('Confirmation email sent successfully', [
+                'lead_id' => $lead->id,
+                'email' => $lead->email,
+            ]);
+
             return true;
         } catch (\Exception $e) {
-            \Log::error('Failed to send confirmation email', [
+            // Restore original timeout in case of error
+            ini_set('default_socket_timeout', $originalTimeout ?? 60);
+
+            Log::error('Failed to send confirmation email', [
                 'lead_id' => $lead->id,
+                'email' => $lead->email,
                 'error' => $e->getMessage(),
+                'smtp_host' => $smtpProfile->host,
             ]);
 
             return false;

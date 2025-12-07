@@ -72,6 +72,12 @@ return Application::configure(basePath: dirname(__DIR__))
                 }
             }
         })->name('mailwizz-import-check')->everyMinute()->withoutOverlapping();
+
+        // Retry failed jobs (especially confirmation emails) every 30 minutes
+        $schedule->command('queue:retry-failed --limit=50 --older-than=30')
+            ->everyThirtyMinutes()
+            ->withoutOverlapping()
+            ->runInBackground();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
