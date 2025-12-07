@@ -9,9 +9,6 @@ use App\Models\User;
 use Livewire\Volt\Volt;
 
 beforeEach(function () {
-    require_once __DIR__.'/../Sprint1/EnsureMigrationsRun.php';
-    ensureMigrationsRun();
-
     $this->adminRole = Role::firstOrCreate(
         ['slug' => 'super_admin'],
         ['name' => 'Super Admin', 'slug' => 'super_admin']

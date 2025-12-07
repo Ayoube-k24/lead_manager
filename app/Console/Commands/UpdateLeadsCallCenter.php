@@ -56,7 +56,8 @@ class UpdateLeadsCallCenter extends Command
             }
         }
 
-        $this->info("{$updated} leads mis à jour avec succès.");
+        $leadWord = $updated === 1 ? 'lead' : 'leads';
+        $this->info("{$updated} {$leadWord} mis à jour avec succès.");
 
         // Count leads that still don't have call_center_id
         $stillWithoutCallCenter = Lead::whereNull('call_center_id')
@@ -66,7 +67,11 @@ class UpdateLeadsCallCenter extends Command
             ->count();
 
         if ($stillWithoutCallCenter > 0) {
-            $this->warn("{$stillWithoutCallCenter} leads ne peuvent pas être mis à jour car leur formulaire n'a pas de centre d'appel associé.");
+            if ($stillWithoutCallCenter === 1) {
+                $this->warn("1 lead ne peut pas être mis à jour car son formulaire n'a pas de centre d'appel associé.");
+            } else {
+                $this->warn("{$stillWithoutCallCenter} leads ne peuvent pas être mis à jour car leur formulaire n'a pas de centre d'appel associé.");
+            }
             $this->info('Assurez-vous d\'associer un centre d\'appel aux formulaires dans l\'interface d\'administration.');
         }
 

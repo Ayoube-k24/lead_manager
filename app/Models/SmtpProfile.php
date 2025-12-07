@@ -62,16 +62,33 @@ class SmtpProfile extends Model
     /**
      * Set the password attribute (encrypt it).
      */
-    public function setPasswordAttribute(string $value): void
+    public function setPasswordAttribute(?string $value): void
     {
+        if (empty($value)) {
+            // Don't update password if empty
+            unset($this->attributes['password']);
+
+            return;
+        }
+
         $this->attributes['password'] = Crypt::encryptString($value);
     }
 
     /**
      * Get the password attribute (decrypt it).
      */
-    public function getPasswordAttribute(string $value): string
+    public function getPasswordAttribute(?string $value): ?string
     {
-        return Crypt::decryptString($value);
+        if (empty($value)) {
+            return null;
+        }
+
+        try {
+            return Crypt::decryptString($value);
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            // If decryption fails (e.g., invalid MAC, wrong key), return null
+            // This can happen if the encryption key changed or data is corrupted
+            return null;
+        }
     }
 }

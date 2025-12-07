@@ -21,7 +21,7 @@ describe('UpdateLeadsCallCenter Command', function () {
 
         $this->artisan('leads:update-call-center')
             ->assertSuccessful()
-            ->expectsOutput('1 leads mis à jour avec succès.');
+            ->expectsOutput('1 lead mis à jour avec succès.');
 
         expect($lead->fresh()->call_center_id)->toBe($callCenter->id);
     });
@@ -62,7 +62,7 @@ describe('UpdateLeadsCallCenter Command', function () {
 
         $this->artisan('leads:update-call-center')
             ->assertSuccessful()
-            ->expectsOutput('1 leads ne peuvent pas être mis à jour car leur formulaire n\'a pas de centre d\'appel associé.');
+            ->expectsOutput('1 lead ne peut pas être mis à jour car son formulaire n\'a pas de centre d\'appel associé.');
     });
 
     test('returns success when no leads to update', function () {

@@ -374,7 +374,6 @@ new class extends Component {
                 </div>
             </div>
         </div>
-    @endif
 
     <!-- Filtres -->
     <div class="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-800 sm:flex-row">
