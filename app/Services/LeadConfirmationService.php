@@ -67,20 +67,14 @@ class LeadConfirmationService
         $mailer = $this->configureMailer($smtpProfile);
 
         try {
-            // Set a shorter timeout for immediate sending (5 seconds)
-            // This prevents blocking if SMTP is slow or unreachable
-            $originalTimeout = ini_get('default_socket_timeout');
-            ini_set('default_socket_timeout', 5);
-
+            // Send email synchronously (directly) without timeout restrictions
+            // If sending fails, it will be queued for retry
             $mailer->raw($bodyText, function ($message) use ($lead, $smtpProfile, $subject, $bodyHtml) {
                 $message->to($lead->email)
                     ->subject($subject)
                     ->from($smtpProfile->from_address, $smtpProfile->from_name)
                     ->html($bodyHtml);
             });
-
-            // Restore original timeout
-            ini_set('default_socket_timeout', $originalTimeout);
 
             Log::info('Confirmation email sent successfully', [
                 'lead_id' => $lead->id,
@@ -89,9 +83,6 @@ class LeadConfirmationService
 
             return true;
         } catch (\Exception $e) {
-            // Restore original timeout in case of error
-            ini_set('default_socket_timeout', $originalTimeout ?? 60);
-
             Log::error('Failed to send confirmation email', [
                 'lead_id' => $lead->id,
                 'email' => $lead->email,

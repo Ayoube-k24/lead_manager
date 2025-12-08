@@ -75,7 +75,8 @@ class RetryFailedJobs extends Command
                     ]);
                 } else {
                     // Pour les autres types de jobs, on peut aussi les relancer
-                    $this->line("Relance du job (ID: {$failedJob->id}, Type: {$payload['displayName'] ?? 'unknown'})...");
+                    $jobType = $payload['displayName'] ?? 'unknown';
+                    $this->line("Relance du job (ID: {$failedJob->id}, Type: {$jobType})...");
 
                     Artisan::call('queue:retry', [
                         'id' => $failedJob->uuid,
