@@ -61,6 +61,42 @@ select:focus[data-flux-control] {
     @apply outline-hidden ring-2 ring-accent ring-offset-2 ring-offset-accent-foreground;
 }
 
+/* Style global pour le modal d'envoi d'email - Agrandir pour l'éditeur visuel */
+.email-send-modal-large [role="dialog"],
+[name="send-email"][role="dialog"],
+[role="dialog"]:has([name="send-email"]),
+[role="dialog"]:has(form[wire\:submit="sendEmail"]),
+[role="dialog"]:has(.email-send-modal-large) {
+    max-width: 98vw !important;
+    width: 98vw !important;
+    min-width: 1600px !important;
+    max-height: 98vh !important;
+    height: 98vh !important;
+    margin: 1vh auto !important;
+}
+
+@media (max-width: 1600px) {
+    .email-send-modal-large [role="dialog"],
+    [name="send-email"][role="dialog"],
+    [role="dialog"]:has([name="send-email"]),
+    [role="dialog"]:has(form[wire\:submit="sendEmail"]),
+    [role="dialog"]:has(.email-send-modal-large) {
+        min-width: 1200px !important;
+        width: 95vw !important;
+    }
+}
+
+@media (max-width: 1280px) {
+    .email-send-modal-large [role="dialog"],
+    [name="send-email"][role="dialog"],
+    [role="dialog"]:has([name="send-email"]),
+    [role="dialog"]:has(form[wire\:submit="sendEmail"]),
+    [role="dialog"]:has(.email-send-modal-large) {
+        min-width: 95vw !important;
+        width: 95vw !important;
+    }
+}
+
 /* \[:where(&)\]:size-4 {
     @apply size-4;
 } */

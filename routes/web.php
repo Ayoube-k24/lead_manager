@@ -15,10 +15,22 @@ Route::get('/', function () {
     return view('livewire.auth.login');
 })->name('home');
 
-// Redirection de /login vers / pour éviter la confusion
+// Route /login - affiche directement la page de login (évite les problèmes de CSRF avec les redirections)
 Route::get('/login', function () {
-    return redirect()->route('home');
+    /** @var \Illuminate\Contracts\Auth\Guard $guard */
+    $guard = auth();
+    if ($guard->check()) {
+        return redirect()->route('dashboard');
+    }
+
+    return view('livewire.auth.login');
 })->name('login');
+
+// Redirection de GET /logout vers la page d'accueil
+// La déconnexion doit être faite via POST (formulaire)
+Route::get('/logout', function () {
+    return redirect()->route('home');
+});
 
 // Sprint 3: Routes publiques pour les formulaires et confirmation email
 // Handle CORS preflight requests
@@ -86,6 +98,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Sprint 8: Calendrier des rappels
         Volt::route('agent/reminders/calendar', 'reminders.calendar')
             ->name('agent.reminders.calendar');
+
+        // Alertes Agent
+        Volt::route('agent/alerts', 'agent.alerts')
+            ->name('agent.alerts');
     });
 
     // Gestion des agents par les superviseurs
@@ -98,6 +114,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('supervisor.leads');
         Volt::route('supervisor/statistics', 'supervisor.statistics')
             ->name('supervisor.statistics');
+        Volt::route('supervisor/alerts', 'supervisor.alerts')
+            ->name('supervisor.alerts');
     });
 
     // Sprint 4: Gestion des agents par les propriétaires de centres d'appels
@@ -112,6 +130,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('owner.agents.stats');
         Volt::route('owner/leads', 'owner.leads')
             ->name('owner.leads');
+        Volt::route('owner/leads/{lead}', 'owner.leads.show')
+            ->name('owner.leads.show');
         Volt::route('owner/leads/{lead}/assign', 'owner.leads.assign')
             ->name('owner.leads.assign');
         Volt::route('owner/distribution', 'owner.distribution')
@@ -148,6 +168,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('owner.webhooks');
         Volt::route('owner/webhooks/create', 'owner.webhooks.create')
             ->name('owner.webhooks.create');
+
+        // Gestion des Accès (Call Center Owners)
+        Volt::route('owner/access-management', 'owner.access-management')
+            ->name('owner.access-management');
+
+        // Alertes Owner
+        Volt::route('owner/alerts', 'owner.alerts')
+            ->name('owner.alerts');
     });
 
     // Sprint 2: Gestion des formulaires et profils SMTP (Super Admin uniquement)
@@ -171,6 +199,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('admin.email-templates.create');
         Volt::route('admin/email-templates/{emailTemplate}/edit', 'admin.email-templates.edit')
             ->name('admin.email-templates.edit');
+
+        // Sujets d'email
+        Volt::route('admin/email-subjects', 'admin.email-subjects')
+            ->name('admin.email-subjects');
+        Volt::route('admin/email-subjects/create', 'admin.email-subjects.create')
+            ->name('admin.email-subjects.create');
+        Volt::route('admin/email-subjects/{emailSubject}/edit', 'admin.email-subjects.edit')
+            ->name('admin.email-subjects.edit');
 
         // Formulaires
         Volt::route('admin/forms', 'admin.forms')
@@ -247,6 +283,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('admin.api-tokens');
         Volt::route('admin/api/documentation', 'admin.api-documentation')
             ->name('admin.api.documentation');
+
+        // Paramètres Super Admin
+        Volt::route('admin/settings', 'admin.settings')
+            ->name('admin.settings');
+
+        // Gestion unifiée des Alertes (Types + Alertes actives)
+        Volt::route('admin/alerts-management', 'admin.alerts-management')
+            ->name('admin.alerts-management');
+
+        // Configuration des Types d'Alertes (ancienne route, redirigée)
+        Volt::route('admin/alert-types', 'admin.alert-types')
+            ->name('admin.alert-types');
+
+        // Alertes Super Admin
+        Volt::route('admin/alerts', 'admin.alerts')
+            ->name('admin.alerts');
     });
 });
 

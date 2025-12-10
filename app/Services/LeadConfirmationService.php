@@ -7,6 +7,7 @@ use App\Models\Lead;
 use App\Models\SmtpProfile;
 use Illuminate\Mail\Mailer;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -82,9 +83,18 @@ class LeadConfirmationService
 
         // Check if password is available
         if (empty($password)) {
+            // Check if raw password exists in database
+            $rawPassword = DB::table('smtp_profiles')
+                ->where('id', $smtpProfile->id)
+                ->value('password');
+
             Log::error('SMTP password is empty or could not be decrypted', [
                 'lead_id' => $lead->id,
                 'smtp_profile_id' => $smtpProfile->id,
+                'smtp_profile_name' => $smtpProfile->name,
+                'raw_password_exists' => ! empty($rawPassword),
+                'raw_password_length' => $rawPassword ? strlen($rawPassword) : 0,
+                'action_required' => 'Please update the SMTP profile password in the admin panel',
             ]);
 
             return false;
@@ -96,11 +106,12 @@ class LeadConfirmationService
         try {
             // Send email synchronously (directly) without timeout restrictions
             // If sending fails, it will be queued for retry
-            // Use raw() method to send HTML email
-            $mailer->raw($bodyHtml, function ($message) use ($lead, $smtpProfile, $subject, $bodyText) {
+            // Use send() with a view to properly send HTML email
+            $mailer->send([], [], function ($message) use ($lead, $smtpProfile, $subject, $bodyHtml, $bodyText) {
                 $message->to($lead->email)
                     ->subject($subject)
-                    ->from($smtpProfile->from_address, $smtpProfile->from_name);
+                    ->from($smtpProfile->from_address, $smtpProfile->from_name)
+                    ->html($bodyHtml);
 
                 // Add text version if available
                 if (! empty($bodyText)) {
@@ -275,10 +286,11 @@ class LeadConfirmationService
             try {
                 $mailer = $this->configureMailer($alternativeProfile, $password);
 
-                $mailer->raw($bodyHtml, function ($message) use ($lead, $alternativeProfile, $subject, $bodyText) {
+                $mailer->send([], [], function ($message) use ($lead, $alternativeProfile, $subject, $bodyHtml, $bodyText) {
                     $message->to($lead->email)
                         ->subject($subject)
-                        ->from($alternativeProfile->from_address, $alternativeProfile->from_name);
+                        ->from($alternativeProfile->from_address, $alternativeProfile->from_name)
+                        ->html($bodyHtml);
 
                     if (! empty($bodyText)) {
                         $message->text($bodyText);

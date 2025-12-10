@@ -129,5 +129,55 @@ new class extends Component
             <p class="text-sm text-neutral-900 dark:text-neutral-100">{{ $this->lead->call_comment }}</p>
         </div>
     @endif
+
+    <!-- Historique des statuts -->
+    @php
+        $statusHistory = $this->lead->getStatusHistory();
+    @endphp
+    @if ($statusHistory->isNotEmpty())
+        <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
+            <h2 class="mb-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                {{ __('Historique des statuts') }}
+            </h2>
+            <div class="space-y-3">
+                @foreach ($statusHistory as $log)
+                    @php
+                        $oldStatus = \App\Models\LeadStatus::getBySlug($log->properties['old_status'] ?? '');
+                        $newStatus = \App\Models\LeadStatus::getBySlug($log->properties['new_status'] ?? '');
+                    @endphp
+                    <div class="flex items-start gap-3 border-b border-neutral-200 pb-3 last:border-0 dark:border-neutral-700">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2">
+                                @if ($oldStatus && $newStatus)
+                                    <span class="text-sm text-neutral-600 dark:text-neutral-400">
+                                        {{ $oldStatus->getLabel() }}
+                                    </span>
+                                    <span class="text-neutral-400">→</span>
+                                    <span class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ $newStatus->getColorClass() }}">
+                                        {{ $newStatus->getLabel() }}
+                                    </span>
+                                @else
+                                    <span class="text-sm text-neutral-900 dark:text-neutral-100">
+                                        {{ $log->properties['new_status'] ?? 'N/A' }}
+                                    </span>
+                                @endif
+                            </div>
+                            @if (!empty($log->properties['comment']))
+                                <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                                    {{ $log->properties['comment'] }}
+                                </p>
+                            @endif
+                            <p class="mt-1 text-xs text-neutral-400 dark:text-neutral-500">
+                                {{ $log->created_at->format('d/m/Y H:i') }}
+                                @if ($log->user)
+                                    • {{ $log->user->name }}
+                                @endif
+                            </p>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
 </div>
 

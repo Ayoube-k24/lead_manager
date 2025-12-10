@@ -15,6 +15,7 @@ describe('AlertsCheckCommand', function () {
 
         $alert = Alert::factory()->create([
             'user_id' => $user->id,
+            'role_slug' => $user->role?->slug,
             'is_active' => true,
             'type' => 'lead_stale',
             'threshold' => 0,

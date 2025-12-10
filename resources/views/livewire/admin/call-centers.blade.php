@@ -20,6 +20,7 @@ new class extends Component {
     /** @var list<int> */
     public array $agentIds = [];
     public string $distributionMethod = 'round_robin';
+    public string $distributionTiming = 'after_email_confirmation';
     public bool $isActive = true;
     public string $newCenterName = '';
     public ?string $newCenterDescription = null;
@@ -27,12 +28,15 @@ new class extends Component {
     public string $newOwnerEmail = '';
     public string $newOwnerPassword = '';
     public string $newDistributionMethod = 'round_robin';
+    public string $newDistributionTiming = 'after_email_confirmation';
     public bool $newIsActive = true;
 
     public function mount(): void
     {
         $this->distributionMethod = 'round_robin';
+        $this->distributionTiming = 'after_email_confirmation';
         $this->newDistributionMethod = 'round_robin';
+        $this->newDistributionTiming = 'after_email_confirmation';
     }
 
     public function updatingSearch(): void
@@ -53,6 +57,7 @@ new class extends Component {
             ->map(fn ($id) => (int) $id)
             ->toArray();
         $this->distributionMethod = $callCenter->distribution_method ?? 'round_robin';
+        $this->distributionTiming = $callCenter->distribution_timing ?? 'after_email_confirmation';
         $this->isActive = (bool) $callCenter->is_active;
         $this->showAccessModal = true;
     }
@@ -67,6 +72,7 @@ new class extends Component {
             'agentIds',
         ]);
         $this->distributionMethod = 'round_robin';
+        $this->distributionTiming = 'after_email_confirmation';
         $this->isActive = true;
     }
 
@@ -81,6 +87,7 @@ new class extends Component {
             'newOwnerPassword',
         ]);
         $this->newDistributionMethod = 'round_robin';
+        $this->newDistributionTiming = 'after_email_confirmation';
         $this->newIsActive = true;
         $this->showCreateModal = true;
     }
@@ -96,6 +103,7 @@ new class extends Component {
             'newOwnerPassword',
         ]);
         $this->newDistributionMethod = 'round_robin';
+        $this->newDistributionTiming = 'after_email_confirmation';
         $this->newIsActive = true;
     }
 
@@ -107,6 +115,7 @@ new class extends Component {
             'agentIds' => ['array'],
             'agentIds.*' => [Rule::exists('users', 'id')],
             'distributionMethod' => ['required', Rule::in(['round_robin', 'weighted', 'manual'])],
+            'distributionTiming' => ['required', Rule::in(['after_registration', 'after_email_confirmation'])],
         ]);
 
         $callCenter = CallCenter::findOrFail($this->editingCenterId);
@@ -118,6 +127,7 @@ new class extends Component {
         $callCenter->fill([
             'owner_id' => $owner->id,
             'distribution_method' => $this->distributionMethod,
+            'distribution_timing' => $this->distributionTiming,
             'is_active' => $this->isActive,
         ])->save();
 
@@ -155,6 +165,7 @@ new class extends Component {
             'newOwnerEmail' => ['required', 'email', Rule::unique('users', 'email')],
             'newOwnerPassword' => ['required', 'string', 'min:8'],
             'newDistributionMethod' => ['required', Rule::in(['round_robin', 'weighted', 'manual'])],
+            'newDistributionTiming' => ['required', Rule::in(['after_registration', 'after_email_confirmation'])],
         ], [], [
             'newCenterName' => __('Nom du centre'),
             'newOwnerName' => __('Nom du propriétaire'),
@@ -184,6 +195,7 @@ new class extends Component {
             'description' => $this->newCenterDescription,
             'owner_id' => $owner->id,
             'distribution_method' => $this->newDistributionMethod,
+            'distribution_timing' => $this->newDistributionTiming,
             'is_active' => $this->newIsActive,
         ]);
 
@@ -228,6 +240,10 @@ new class extends Component {
                 'round_robin' => __('Round Robin équilibré'),
                 'weighted' => __('Répartition pondérée'),
                 'manual' => __('Attribution manuelle'),
+            ],
+            'distributionTimings' => [
+                'after_registration' => __('Après inscription'),
+                'after_email_confirmation' => __('Après validation email opt-in'),
             ],
         ];
     }
@@ -372,13 +388,19 @@ new class extends Component {
                     @endforeach
                 </flux:select>
 
-                <div class="flex items-center justify-between rounded-lg border border-neutral-200 px-4 py-3 dark:border-neutral-700">
-                    <div>
-                        <p class="text-sm font-medium text-neutral-900 dark:text-neutral-50">{{ __('Centre actif') }}</p>
-                        <p class="text-xs text-neutral-500 dark:text-neutral-400">{{ __('Désactivez pour suspendre toutes les opérations.') }}</p>
-                    </div>
-                    <flux:switch wire:model="isActive" />
+                <flux:select wire:model="distributionTiming" :label="__('Moment de distribution')">
+                    @foreach ($distributionTimings as $value => $label)
+                        <option value="{{ $value }}">{{ $label }}</option>
+                    @endforeach
+                </flux:select>
+            </div>
+
+            <div class="flex items-center justify-between rounded-lg border border-neutral-200 px-4 py-3 dark:border-neutral-700">
+                <div>
+                    <p class="text-sm font-medium text-neutral-900 dark:text-neutral-50">{{ __('Centre actif') }}</p>
+                    <p class="text-xs text-neutral-500 dark:text-neutral-400">{{ __('Désactivez pour suspendre toutes les opérations.') }}</p>
                 </div>
+                <flux:switch wire:model="isActive" />
             </div>
 
             <div class="space-y-3">
@@ -444,6 +466,12 @@ new class extends Component {
                     @endforeach
                 </flux:select>
             </div>
+
+            <flux:select wire:model="newDistributionTiming" :label="__('Moment de distribution')">
+                @foreach ($distributionTimings as $value => $label)
+                    <option value="{{ $value }}">{{ $label }}</option>
+                @endforeach
+            </flux:select>
             @error('newCenterName')
                 <p class="text-sm text-red-500">{{ $message }}</p>
             @enderror

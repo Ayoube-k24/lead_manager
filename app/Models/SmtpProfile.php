@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use App\Traits\Auditable;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Log;
 
 class SmtpProfile extends Model
 {
@@ -85,9 +87,22 @@ class SmtpProfile extends Model
 
         try {
             return Crypt::decryptString($value);
-        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
-            // If decryption fails (e.g., invalid MAC, wrong key), return null
+        } catch (DecryptException $e) {
+            // If decryption fails (e.g., invalid MAC, wrong key), log and return null
             // This can happen if the encryption key changed or data is corrupted
+            Log::error('Failed to decrypt SMTP password', [
+                'smtp_profile_id' => $this->id,
+                'smtp_profile_name' => $this->name,
+                'error' => $e->getMessage(),
+                'raw_password_length' => strlen($value),
+                'raw_password_preview' => substr($value, 0, 20).'...',
+                'possible_causes' => [
+                    'APP_KEY may have changed',
+                    'Password may have been corrupted',
+                    'Password may not have been encrypted when stored',
+                ],
+            ]);
+
             return null;
         }
     }

@@ -20,10 +20,12 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RoleSeeder::class,
             UserSeeder::class,
-            //SmtpProfileSeeder::class,
+            // SmtpProfileSeeder::class,
             EmailTemplateSeeder::class,
+            EmailSubjectSeeder::class,
             LeadStatusSeeder::class,
-            //FormSeeder::class,
+            RoleAlertTypeSeeder::class,
+            // FormSeeder::class,
         ]);
 
         $this->command->newLine();

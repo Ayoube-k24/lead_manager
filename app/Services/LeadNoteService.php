@@ -78,11 +78,11 @@ class LeadNoteService
 
         // Filter private notes based on user permissions
         if ($user) {
-            $query->where(function ($q) use ($user) {
+            $query->where(function ($q) use ($user, $lead) {
                 $q->where('is_private', false)
-                    ->orWhere(function ($subQ) use ($user) {
+                    ->orWhere(function ($subQ) use ($user, $lead) {
                         $subQ->where('is_private', true)
-                            ->where(function ($privateQ) use ($user) {
+                            ->where(function ($privateQ) use ($user, $lead) {
                                 $privateQ->where('user_id', $user->id);
 
                                 // Super admins can see all private notes

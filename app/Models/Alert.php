@@ -18,6 +18,7 @@ class Alert extends Model
      */
     protected $fillable = [
         'user_id',
+        'role_slug',
         'name',
         'type',
         'conditions',
@@ -54,6 +55,22 @@ class Alert extends Model
     }
 
     /**
+     * Get the role that owns the alert.
+     */
+    public function role(): BelongsTo
+    {
+        return $this->belongsTo(Role::class, 'role_slug', 'slug');
+    }
+
+    /**
+     * Scope a query to only include alerts for a specific role.
+     */
+    public function scopeForRole($query, string $roleSlug)
+    {
+        return $query->where('role_slug', $roleSlug);
+    }
+
+    /**
      * Check if alert can be triggered (cooldown check).
      */
     public function canBeTriggered(int $cooldownMinutes = 60): bool
@@ -85,6 +102,7 @@ class Alert extends Model
             'high_volume' => __('Volume élevé'),
             'low_volume' => __('Volume faible'),
             'form_performance' => __('Performance formulaire'),
+            'status_threshold' => __('Seuil de statut'),
             'smtp_failure' => __('Échec SMTP'),
             default => $this->type,
         };

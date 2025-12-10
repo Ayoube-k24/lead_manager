@@ -83,6 +83,16 @@ new class extends Component
         $this->resetPage();
     }
 
+    public function updatingTagsFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingTagsMode(): void
+    {
+        $this->resetPage();
+    }
+
     public function getLeadsProperty()
     {
         $service = app(LeadSearchService::class);
@@ -158,6 +168,37 @@ new class extends Component
         $this->tagsMode = 'any';
         $this->noTags = null;
         $this->sourceFilter = [];
+        $this->resetPage();
+    }
+
+    public function toggleTag(int $tagId): void
+    {
+        $tagId = (int) $tagId;
+        if (in_array($tagId, $this->tagsFilter)) {
+            $this->tagsFilter = array_values(array_diff($this->tagsFilter, [$tagId]));
+        } else {
+            $this->tagsFilter = array_merge($this->tagsFilter, [$tagId]);
+        }
+        $this->resetPage();
+    }
+
+    public function toggleStatus(string $status): void
+    {
+        if (in_array($status, $this->statusFilter)) {
+            $this->statusFilter = array_values(array_diff($this->statusFilter, [$status]));
+        } else {
+            $this->statusFilter = array_merge($this->statusFilter, [$status]);
+        }
+        $this->resetPage();
+    }
+
+    public function toggleSource(string $source): void
+    {
+        if (in_array($source, $this->sourceFilter)) {
+            $this->sourceFilter = array_values(array_diff($this->sourceFilter, [$source]));
+        } else {
+            $this->sourceFilter = array_merge($this->sourceFilter, [$source]);
+        }
         $this->resetPage();
     }
 
@@ -258,26 +299,14 @@ new class extends Component
                 </label>
                 <div class="flex flex-wrap gap-2">
                     <button
-                        wire:click="
-                            @if(in_array('form', $sourceFilter))
-                                $set('sourceFilter', array_values(array_diff($sourceFilter, ['form'])))
-                            @else
-                                $set('sourceFilter', array_merge($sourceFilter, ['form']))
-                            @endif
-                        "
+                        wire:click="toggleSource('form')"
                         type="button"
                         class="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition-all {{ in_array('form', $sourceFilter) ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-500 ring-offset-2' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700' }}"
                     >
                         {{ __('Formulaire') }}
                     </button>
                     <button
-                        wire:click="
-                            @if(in_array('leads_seo', $sourceFilter))
-                                $set('sourceFilter', array_values(array_diff($sourceFilter, ['leads_seo'])))
-                            @else
-                                $set('sourceFilter', array_merge($sourceFilter, ['leads_seo']))
-                            @endif
-                        "
+                        wire:click="toggleSource('leads_seo')"
                         type="button"
                         class="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition-all {{ in_array('leads_seo', $sourceFilter) ? 'bg-green-600 text-white shadow-md ring-2 ring-green-500 ring-offset-2' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700' }}"
                     >
@@ -298,13 +327,7 @@ new class extends Component
                         $isActive = in_array($status->slug, $statusFilter);
                     @endphp
                     <button
-                        wire:click="
-                            @if($isActive)
-                                $set('statusFilter', array_values(array_diff($statusFilter, ['{{ $status->slug }}'])))
-                            @else
-                                $set('statusFilter', array_merge($statusFilter, ['{{ $status->slug }}']))
-                            @endif
-                        "
+                        wire:click="toggleStatus('{{ $status->slug }}')"
                         type="button"
                         class="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition-all {{ $isActive ? 'shadow-md ring-2 ring-offset-2 ' . str_replace('bg-', 'ring-', explode(' ', $status->getColorClass())[0]) . ' ' . $status->getColorClass() : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700' }}"
                     >
@@ -357,13 +380,7 @@ new class extends Component
                                 $isSelected = in_array($tag->id, $tagsFilter);
                             @endphp
                             <button
-                                wire:click="
-                                    @if($isSelected)
-                                        $set('tagsFilter', array_values(array_diff($tagsFilter, [{{ $tag->id }}])))
-                                    @else
-                                        $set('tagsFilter', array_merge($tagsFilter, [{{ $tag->id }}]))
-                                    @endif
-                                "
+                                wire:click="toggleTag({{ $tag->id }})"
                                 type="button"
                                 class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-all {{ $isSelected ? 'ring-2 ring-offset-2' : '' }}"
                                 style="{{ $isSelected ? 'background-color: ' . $tag->color . '20; color: ' . $tag->color . '; ring-color: ' . $tag->color : 'background-color: #f3f4f6; color: #6b7280' }}"

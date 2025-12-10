@@ -10,6 +10,7 @@ use Livewire\Volt\Component;
 new class extends Component
 {
     public string $distributionMethod = 'round_robin';
+    public string $distributionTiming = 'after_email_confirmation';
 
     public function mount(): void
     {
@@ -18,6 +19,7 @@ new class extends Component
 
         if ($callCenter) {
             $this->distributionMethod = $callCenter->distribution_method ?? 'round_robin';
+            $this->distributionTiming = $callCenter->distribution_timing ?? 'after_email_confirmation';
         }
     }
 
@@ -25,6 +27,7 @@ new class extends Component
     {
         $this->validate([
             'distributionMethod' => ['required', 'in:round_robin,weighted,manual'],
+            'distributionTiming' => ['required', 'in:after_registration,after_email_confirmation'],
         ]);
 
         $user = Auth::user();
@@ -36,7 +39,9 @@ new class extends Component
         }
 
         $oldMethod = $callCenter->distribution_method;
+        $oldTiming = $callCenter->distribution_timing;
         $callCenter->distribution_method = $this->distributionMethod;
+        $callCenter->distribution_timing = $this->distributionTiming;
         $callCenter->save();
 
         // Log the change
@@ -44,6 +49,15 @@ new class extends Component
             $auditService->logDistributionMethodChanged($callCenter, $oldMethod, $this->distributionMethod);
         }
 
+        if ($oldTiming !== $this->distributionTiming) {
+            $auditService->log('distribution_timing_changed', [
+                'call_center_id' => $callCenter->id,
+                'old_timing' => $oldTiming,
+                'new_timing' => $this->distributionTiming,
+            ]);
+        }
+
+        session()->flash('message', __('Configuration mise à jour avec succès !'));
         $this->dispatch('distribution-method-updated');
     }
 
@@ -144,6 +158,12 @@ new class extends Component
         </div>
     </div>
 
+    @if (session()->has('message'))
+        <flux:callout variant="success" icon="check-circle">
+            {{ session('message') }}
+        </flux:callout>
+    @endif
+
     <!-- Configuration de la méthode de distribution -->
     <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
         <h2 class="mb-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
@@ -183,9 +203,49 @@ new class extends Component
                 </label>
             </div>
 
+            <div class="border-t border-neutral-200 pt-6 dark:border-neutral-700">
+                <h3 class="mb-4 text-base font-semibold text-neutral-900 dark:text-neutral-100">
+                    {{ __('Moment de distribution') }}
+                </h3>
+                <p class="mb-4 text-sm text-neutral-600 dark:text-neutral-400">
+                    {{ __('Choisissez à quel moment les leads doivent être distribués aux agents') }}
+                </p>
+
+                <div class="space-y-4">
+                    <label class="flex items-start gap-3 rounded-lg border border-neutral-200 p-4 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-700/50 {{ $distributionTiming === 'after_registration' ? 'border-blue-500 bg-blue-50 dark:border-blue-500 dark:bg-blue-900/20' : '' }}">
+                        <input type="radio" wire:model="distributionTiming" value="after_registration" class="mt-1" />
+                        <div class="flex-1">
+                            <div class="font-semibold text-neutral-900 dark:text-neutral-100">{{ __('Après inscription') }}</div>
+                            <div class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+                                {{ __('Les leads sont distribués immédiatement après leur inscription, sans attendre la confirmation de l\'email.') }}
+                            </div>
+                        </div>
+                    </label>
+
+                    <label class="flex items-start gap-3 rounded-lg border border-neutral-200 p-4 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-700/50 {{ $distributionTiming === 'after_email_confirmation' ? 'border-blue-500 bg-blue-50 dark:border-blue-500 dark:bg-blue-900/20' : '' }}">
+                        <input type="radio" wire:model="distributionTiming" value="after_email_confirmation" class="mt-1" />
+                        <div class="flex-1">
+                            <div class="font-semibold text-neutral-900 dark:text-neutral-100">{{ __('Après validation email opt-in') }}</div>
+                            <div class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+                                {{ __('Les leads sont distribués uniquement après que l\'utilisateur ait confirmé son email via le lien de confirmation.') }}
+                            </div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
             <div class="flex items-center justify-end">
-                <flux:button type="submit" variant="primary">
-                    {{ __('Enregistrer la configuration') }}
+                <flux:button type="submit" variant="primary" wire:loading.attr="disabled">
+                    <span wire:loading.remove wire:target="updateDistributionMethod">
+                        {{ __('Enregistrer la configuration') }}
+                    </span>
+                    <span wire:loading wire:target="updateDistributionMethod" class="flex items-center gap-2">
+                        <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        {{ __('Enregistrement...') }}
+                    </span>
                 </flux:button>
             </div>
         </form>

@@ -43,46 +43,114 @@ new class extends Component {
     public function resetAlertForm(): void
     {
         $this->alertName = '';
-        $this->alertType = 'lead_stale';
-        $this->alertConditions = [];
+        
+        // Get first available type for the role
+        $availableTypes = $this->getAvailableTypes();
+        $this->alertType = ! empty($availableTypes) ? array_key_first($availableTypes) : 'status_threshold';
+        
+        // Initialize conditions from default
+        $this->alertConditions = $this->getTypeConditions($this->alertType);
+        
         $this->alertThreshold = null;
         $this->alertChannels = ['in_app'];
         $this->editingAlertId = null;
     }
 
+    public function updatedAlertType(): void
+    {
+        // When alert type changes, update conditions from default
+        $this->alertConditions = $this->getTypeConditions($this->alertType);
+    }
+
     public function getAvailableTypes(): array
     {
-        return [
-            'lead_stale' => __('Lead inactif'),
-            'agent_performance' => __('Performance agent'),
-            'conversion_rate' => __('Taux de conversion'),
-            'high_volume' => __('Volume élevé'),
-            'low_volume' => __('Volume faible'),
-            'form_performance' => __('Performance formulaire'),
-        ];
+        $roleSlug = Auth::user()->role?->slug;
+        
+        if (! $roleSlug) {
+            return [];
+        }
+
+        $service = app(AlertService::class);
+        $types = $service->getAvailableTypesForRole($roleSlug);
+
+        $result = [];
+        foreach ($types as $typeKey => $typeData) {
+            $result[$typeKey] = $typeData['name'];
+        }
+
+        return $result;
     }
 
     public function getTypeConditions(string $type): array
     {
-        return match ($type) {
-            'lead_stale' => ['hours' => 24],
-            'agent_performance' => ['agent_id' => null],
-            'conversion_rate' => [],
-            'high_volume' => ['hours' => 1],
-            'low_volume' => ['hours' => 1],
-            'form_performance' => ['form_id' => null],
-            default => [],
-        };
+        $roleSlug = Auth::user()->role?->slug;
+        
+        if (! $roleSlug) {
+            return [];
+        }
+
+        // Get default conditions from RoleAlertType
+        $roleAlertType = \App\Models\RoleAlertType::forRole($roleSlug)
+            ->where('alert_type', $type)
+            ->first();
+
+        if ($roleAlertType && $roleAlertType->default_conditions) {
+            $conditions = $roleAlertType->default_conditions;
+        } else {
+            // Fallback to default conditions
+            $conditions = match ($type) {
+                'lead_stale' => ['hours' => 24],
+                'agent_performance' => ['agent_id' => null],
+                'conversion_rate' => [],
+                'high_volume' => ['hours' => 1],
+                'low_volume' => ['hours' => 1],
+                'form_performance' => ['form_id' => null],
+                'status_threshold' => ['status_slug' => null, 'agent_id' => null, 'call_center_id' => null],
+                default => [],
+            };
+        }
+        
+        // For agents creating status_threshold alerts, automatically set their own ID and call center
+        if ($type === 'status_threshold' && Auth::user()->isAgent()) {
+            $conditions['agent_id'] = Auth::id();
+            if (Auth::user()->call_center_id) {
+                $conditions['call_center_id'] = Auth::user()->call_center_id;
+            }
+        }
+        
+        return $conditions;
     }
 
     public function createAlert(): void
     {
-        $this->validate([
+        $rules = [
             'alertName' => ['required', 'string', 'max:255'],
             'alertType' => ['required', 'string'],
             'alertThreshold' => ['nullable', 'numeric', 'min:0'],
             'alertChannels' => ['required', 'array', 'min:1'],
-        ]);
+        ];
+
+        // Add validation rules for status_threshold type
+        if ($this->alertType === 'status_threshold') {
+            $rules['alertConditions.status_slug'] = ['required', 'string'];
+            
+            // For agents, automatically set agent_id and call_center_id
+            if (Auth::user()->isAgent()) {
+                // Automatically set agent_id to the current agent
+                $this->alertConditions['agent_id'] = Auth::id();
+                
+                // Automatically set call_center_id to the agent's call center
+                if (Auth::user()->call_center_id) {
+                    $this->alertConditions['call_center_id'] = Auth::user()->call_center_id;
+                }
+            } else {
+                // For other roles, allow optional selection
+                $rules['alertConditions.agent_id'] = ['nullable', 'integer', 'exists:users,id'];
+                $rules['alertConditions.call_center_id'] = ['nullable', 'integer', 'exists:call_centers,id'];
+            }
+        }
+
+        $this->validate($rules);
 
         $service = app(AlertService::class);
         $service->createAlert(
@@ -99,6 +167,12 @@ new class extends Component {
 
     public function toggleActive(Alert $alert): void
     {
+        // Security check: user can only modify alerts for their role
+        if ($alert->role_slug !== Auth::user()->role?->slug) {
+            session()->flash('error', __('Vous n\'avez pas la permission de modifier cette alerte.'));
+            return;
+        }
+
         if ($alert->is_system) {
             session()->flash('error', __('Les alertes système ne peuvent pas être modifiées.'));
             return;
@@ -112,6 +186,12 @@ new class extends Component {
 
     public function deleteAlert(Alert $alert): void
     {
+        // Security check: user can only delete alerts for their role
+        if ($alert->role_slug !== Auth::user()->role?->slug) {
+            session()->flash('error', __('Vous n\'avez pas la permission de supprimer cette alerte.'));
+            return;
+        }
+
         if ($alert->is_system) {
             session()->flash('error', __('Les alertes système ne peuvent pas être supprimées.'));
             return;
@@ -123,7 +203,10 @@ new class extends Component {
 
     public function with(): array
     {
-        $alerts = Alert::where('user_id', Auth::id())
+        // Filter alerts by user's role
+        $roleSlug = Auth::user()->role?->slug;
+        
+        $alerts = Alert::where('role_slug', $roleSlug)
             ->orderBy('created_at', 'desc')
             ->paginate(10);
 
@@ -180,51 +263,61 @@ new class extends Component {
                         🔔 {{ __('Types d\'alertes disponibles') }}
                     </h3>
                     <div class="space-y-4">
-                        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
-                            <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('Lead inactif') }}</div>
-                            <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-2">{{ __('Détecte les leads qui n\'ont pas été mis à jour depuis X heures') }}</p>
-                            <div class="text-xs text-neutral-500 dark:text-neutral-500">
-                                <strong>{{ __('Exemple :') }}</strong> {{ __('Seuil: 10, Conditions: 24h → Alerte si 10+ leads inactifs depuis 24h') }}
+                        @if (!Auth::user()->isAgent())
+                            <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                                <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('Lead inactif') }}</div>
+                                <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-2">{{ __('Détecte les leads qui n\'ont pas été mis à jour depuis X heures') }}</p>
+                                <div class="text-xs text-neutral-500 dark:text-neutral-500">
+                                    <strong>{{ __('Exemple :') }}</strong> {{ __('Seuil: 10, Conditions: 24h → Alerte si 10+ leads inactifs depuis 24h') }}
+                                </div>
                             </div>
-                        </div>
+
+                            <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                                <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('Performance agent') }}</div>
+                                <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-2">{{ __('Surveille le taux de conversion d\'un agent spécifique') }}</p>
+                                <div class="text-xs text-neutral-500 dark:text-neutral-500">
+                                    <strong>{{ __('Exemple :') }}</strong> {{ __('Seuil: 40%, Agent: #5 → Alerte si taux < 40%') }}
+                                </div>
+                            </div>
+
+                            <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                                <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('Taux de conversion') }}</div>
+                                <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-2">{{ __('Surveille le taux de conversion global de tous les leads') }}</p>
+                                <div class="text-xs text-neutral-500 dark:text-neutral-500">
+                                    <strong>{{ __('Exemple :') }}</strong> {{ __('Seuil: 30% → Alerte si taux global < 30%') }}
+                                </div>
+                            </div>
+
+                            <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                                <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('Volume élevé') }}</div>
+                                <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-2">{{ __('Détecte quand trop de leads arrivent dans un laps de temps') }}</p>
+                                <div class="text-xs text-neutral-500 dark:text-neutral-500">
+                                    <strong>{{ __('Exemple :') }}</strong> {{ __('Seuil: 50, Période: 1h → Alerte si 50+ leads en 1h') }}
+                                </div>
+                            </div>
+
+                            <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                                <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('Volume faible') }}</div>
+                                <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-2">{{ __('Détecte quand trop peu de leads arrivent dans un laps de temps') }}</p>
+                                <div class="text-xs text-neutral-500 dark:text-neutral-500">
+                                    <strong>{{ __('Exemple :') }}</strong> {{ __('Seuil: 5, Période: 2h → Alerte si < 5 leads en 2h') }}
+                                </div>
+                            </div>
+
+                            <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                                <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('Performance formulaire') }}</div>
+                                <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-2">{{ __('Surveille le taux de conversion d\'un formulaire spécifique') }}</p>
+                                <div class="text-xs text-neutral-500 dark:text-neutral-500">
+                                    <strong>{{ __('Exemple :') }}</strong> {{ __('Seuil: 20%, Formulaire: #3 → Alerte si taux < 20%') }}
+                                </div>
+                            </div>
+                        @endif
 
                         <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
-                            <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('Performance agent') }}</div>
-                            <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-2">{{ __('Surveille le taux de conversion d\'un agent spécifique') }}</p>
+                            <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('Seuil de statut') }}</div>
+                            <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-2">{{ __('Alerte lorsque le nombre de leads avec un statut spécifique atteint un seuil') }}</p>
                             <div class="text-xs text-neutral-500 dark:text-neutral-500">
-                                <strong>{{ __('Exemple :') }}</strong> {{ __('Seuil: 40%, Agent: #5 → Alerte si taux < 40%') }}
-                            </div>
-                        </div>
-
-                        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
-                            <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('Taux de conversion') }}</div>
-                            <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-2">{{ __('Surveille le taux de conversion global de tous les leads') }}</p>
-                            <div class="text-xs text-neutral-500 dark:text-neutral-500">
-                                <strong>{{ __('Exemple :') }}</strong> {{ __('Seuil: 30% → Alerte si taux global < 30%') }}
-                            </div>
-                        </div>
-
-                        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
-                            <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('Volume élevé') }}</div>
-                            <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-2">{{ __('Détecte quand trop de leads arrivent dans un laps de temps') }}</p>
-                            <div class="text-xs text-neutral-500 dark:text-neutral-500">
-                                <strong>{{ __('Exemple :') }}</strong> {{ __('Seuil: 50, Période: 1h → Alerte si 50+ leads en 1h') }}
-                            </div>
-                        </div>
-
-                        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
-                            <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('Volume faible') }}</div>
-                            <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-2">{{ __('Détecte quand trop peu de leads arrivent dans un laps de temps') }}</p>
-                            <div class="text-xs text-neutral-500 dark:text-neutral-500">
-                                <strong>{{ __('Exemple :') }}</strong> {{ __('Seuil: 5, Période: 2h → Alerte si < 5 leads en 2h') }}
-                            </div>
-                        </div>
-
-                        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
-                            <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('Performance formulaire') }}</div>
-                            <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-2">{{ __('Surveille le taux de conversion d\'un formulaire spécifique') }}</p>
-                            <div class="text-xs text-neutral-500 dark:text-neutral-500">
-                                <strong>{{ __('Exemple :') }}</strong> {{ __('Seuil: 20%, Formulaire: #3 → Alerte si taux < 20%') }}
+                                <strong>{{ __('Exemple :') }}</strong> {{ __('Statut: En attente d\'appel, Seuil: 20 → Alerte si 20+ leads en attente d\'appel') }}
                             </div>
                         </div>
                     </div>
@@ -521,11 +614,71 @@ new class extends Component {
                 <flux:error name="alertType" />
             </flux:field>
 
+            @if ($alertType === 'status_threshold')
+                <flux:field>
+                    <flux:label>{{ __('Statut à surveiller') }}</flux:label>
+                    <flux:select wire:model="alertConditions.status_slug">
+                        <option value="">{{ __('Sélectionner un statut') }}</option>
+                        @foreach (\App\Models\LeadStatus::allStatuses() as $status)
+                            <option value="{{ $status->slug }}">{{ $status->name }}</option>
+                        @endforeach
+                    </flux:select>
+                    <flux:error name="alertConditions.status_slug" />
+                    <flux:description>{{ __('Le statut pour lequel vous souhaitez être alerté') }}</flux:description>
+                </flux:field>
+                
+                @php
+                    // Get description from RoleAlertType if available
+                    $roleSlug = Auth::user()->role?->slug;
+                    $roleAlertType = $roleSlug ? \App\Models\RoleAlertType::forRole($roleSlug)
+                        ->where('alert_type', $alertType)
+                        ->where('default_conditions->status_slug', $alertConditions['status_slug'] ?? null)
+                        ->first() : null;
+                @endphp
+                @if ($roleAlertType && $roleAlertType->description)
+                    <flux:description class="mt-1 text-xs text-neutral-500">
+                        {{ $roleAlertType->description }}
+                    </flux:description>
+                @endif
+
+                @if (!Auth::user()->isAgent())
+                    <flux:field>
+                        <flux:label>{{ __('Agent (optionnel)') }}</flux:label>
+                        <flux:select wire:model="alertConditions.agent_id">
+                            <option value="">{{ __('Tous les agents') }}</option>
+                            @foreach (\App\Models\User::whereHas('role', fn($q) => $q->where('slug', 'agent'))->get() as $agent)
+                                <option value="{{ $agent->id }}">{{ $agent->name }}</option>
+                            @endforeach
+                        </flux:select>
+                        <flux:error name="alertConditions.agent_id" />
+                        <flux:description>{{ __('Limiter l\'alerte aux leads d\'un agent spécifique') }}</flux:description>
+                    </flux:field>
+
+                    <flux:field>
+                        <flux:label>{{ __('Centre d\'appels (optionnel)') }}</flux:label>
+                        <flux:select wire:model="alertConditions.call_center_id">
+                            <option value="">{{ __('Tous les centres') }}</option>
+                            @foreach (\App\Models\CallCenter::all() as $callCenter)
+                                <option value="{{ $callCenter->id }}">{{ $callCenter->name }}</option>
+                            @endforeach
+                        </flux:select>
+                        <flux:error name="alertConditions.call_center_id" />
+                        <flux:description>{{ __('Limiter l\'alerte aux leads d\'un centre d\'appels spécifique') }}</flux:description>
+                    </flux:field>
+                @endif
+            @endif
+
             <flux:field>
                 <flux:label>{{ __('Seuil') }}</flux:label>
                 <flux:input wire:model="alertThreshold" type="number" step="0.01" placeholder="{{ __('Ex: 10') }}" />
                 <flux:error name="alertThreshold" />
-                <flux:description>{{ __('Le seuil de déclenchement de l\'alerte') }}</flux:description>
+                <flux:description>
+                    @if ($alertType === 'status_threshold')
+                        {{ __('Nombre minimum de leads avec ce statut pour déclencher l\'alerte') }}
+                    @else
+                        {{ __('Le seuil de déclenchement de l\'alerte') }}
+                    @endif
+                </flux:description>
             </flux:field>
 
             <flux:field>

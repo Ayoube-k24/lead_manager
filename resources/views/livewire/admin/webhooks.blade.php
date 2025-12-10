@@ -15,6 +15,7 @@ new class extends Component {
     public array $selected = [];
     public ?int $testingWebhookId = null;
     public ?array $testResult = null;
+    public bool $showGuide = false;
 
     public function updatedSearch(): void
     {
@@ -84,6 +85,11 @@ new class extends Component {
         }
     }
 
+    public function toggleGuide(): void
+    {
+        $this->showGuide = ! $this->showGuide;
+    }
+
     public function getAvailableEvents(): array
     {
         return [
@@ -130,10 +136,17 @@ new class extends Component {
             <h1 class="text-2xl font-bold">{{ __('Webhooks') }}</h1>
             <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">{{ __('Gérez vos webhooks pour intégrer la plateforme avec des systèmes externes') }}</p>
         </div>
-        <flux:button href="{{ route('admin.webhooks.create') }}" variant="primary" icon="plus">
-            {{ __('Nouveau webhook') }}
-        </flux:button>
-    </div>
+        <div class="flex gap-2">
+            <flux:button wire:click="toggleGuide" variant="ghost" :icon="$showGuide ? 'eye-slash' : 'book-open'">
+                {{ $showGuide ? __('Masquer le guide') : __('Afficher le guide') }}
+            </flux:button>
+            <flux:button href="{{ route('admin.webhooks.create') }}" variant="primary" icon="plus">
+                {{ __('Nouveau webhook') }}
+            </flux:button>
+        </div>
+        </div>
+        
+        @if ($showGuide)
         <div class="rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
             <div class="border-b border-neutral-200 p-6 dark:border-neutral-700">
                 <h2 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{{ __('Guide complet des webhooks') }}</h2>
@@ -374,6 +387,7 @@ new class extends Component {
                 </div>
             </div>
         </div>
+        @endif
 
     <!-- Filtres -->
     <div class="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-800 sm:flex-row">

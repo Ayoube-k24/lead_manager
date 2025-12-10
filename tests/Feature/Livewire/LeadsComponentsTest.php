@@ -7,7 +7,6 @@ use App\Models\Form;
 use App\Models\Lead;
 use App\Models\Role;
 use App\Models\User;
-use Livewire\Volt\Volt;
 
 describe('Leads Components', function () {
     test('owner leads list loads correctly', function () {
@@ -99,5 +98,43 @@ describe('Leads Components', function () {
         $response->assertSuccessful();
         $response->assertSee('test@example.com');
     });
-});
 
+    test('owner leads display correctly in manual distribution mode', function () {
+        $ownerRole = Role::firstOrCreate(['slug' => 'call_center_owner'], ['name' => 'Call Center Owner']);
+        $callCenter = CallCenter::factory()->create(['distribution_method' => 'manual']);
+        $user = User::factory()->withoutTwoFactor()->create([
+            'role_id' => $ownerRole->id,
+            'call_center_id' => $callCenter->id,
+            'is_active' => true,
+        ]);
+
+        $agentRole = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
+        User::factory()->create([
+            'role_id' => $agentRole->id,
+            'call_center_id' => $callCenter->id,
+            'is_active' => true,
+        ]);
+
+        $form = Form::factory()->create(['call_center_id' => $callCenter->id]);
+
+        // Create unassigned leads that should be visible in manual mode
+        $unassignedLead = Lead::factory()->create([
+            'form_id' => $form->id,
+            'call_center_id' => $callCenter->id,
+            'status' => 'email_confirmed',
+            'assigned_to' => null,
+            'source' => 'form',
+            'score' => 50,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('owner.leads'));
+        $response->assertSuccessful();
+
+        // Should see the unassigned lead
+        $response->assertSee($unassignedLead->email);
+
+        // Should see the assign button (not auto button in manual mode)
+        $response->assertSee(__('Assigner'));
+        $response->assertDontSee(__('Auto'));
+    });
+});

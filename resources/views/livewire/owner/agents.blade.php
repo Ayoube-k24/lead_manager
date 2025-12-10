@@ -3,6 +3,7 @@
 use App\Models\Lead;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Laravel\Fortify\Actions\DisableTwoFactorAuthentication;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 
@@ -49,24 +50,86 @@ new class extends Component
         return $query->latest()->paginate(15);
     }
 
-    public function toggleStatus(User $agent): void
+    public function toggleStatus(int $agentId): void
     {
+        $agent = User::find($agentId);
+
+        if (! $agent) {
+            $this->dispatch('agent-error', message: __('Agent introuvable.'));
+
+            return;
+        }
+
         // Vérifier que l'agent appartient au centre d'appels du propriétaire
         $user = Auth::user();
         if ($agent->call_center_id !== $user->call_center_id) {
+            $this->dispatch('agent-error', message: __('Vous n\'êtes pas autorisé à modifier cet agent.'));
+
+            return;
+        }
+
+        // Vérifier que c'est bien un agent
+        if ($agent->role?->slug !== 'agent') {
+            $this->dispatch('agent-error', message: __('Cet utilisateur n\'est pas un agent.'));
+
             return;
         }
 
         // Vérifier qu'il n'y a pas de leads assignés si on désactive
-        if ($agent->is_active && $agent->assignedLeads()->whereIn('status', ['pending_call', 'email_confirmed', 'callback_pending'])->exists()) {
-            $this->dispatch('agent-has-leads');
+        if ($agent->is_active) {
+            $hasActiveLeads = $agent->assignedLeads()
+                ->whereIn('status', ['pending_call', 'email_confirmed', 'callback_pending'])
+                ->exists();
+
+            if ($hasActiveLeads) {
+                $this->dispatch('agent-has-leads');
+
+                return;
+            }
+        }
+
+        // Toggle le statut
+        $agent->is_active = ! $agent->is_active;
+        $saved = $agent->save();
+
+        if (! $saved) {
+            $this->dispatch('agent-error', message: __('Erreur lors de la modification du statut de l\'agent.'));
+
             return;
         }
 
-        $agent->is_active = ! $agent->is_active;
-        $agent->save();
+        // Rafraîchir l'agent pour s'assurer d'avoir la valeur à jour
+        $agent->refresh();
+
+        // Recharger la liste des agents pour refléter les changements
+        $this->resetPage();
 
         $this->dispatch($agent->is_active ? 'agent-activated' : 'agent-deactivated');
+    }
+
+    public function disableMfa(int $agentId, DisableTwoFactorAuthentication $disableTwoFactorAuthentication): void
+    {
+        $agent = User::findOrFail($agentId);
+        $owner = Auth::user();
+
+        // Vérifier que l'agent appartient au centre d'appels du propriétaire
+        if ($agent->call_center_id !== $owner->call_center_id) {
+            $this->dispatch('mfa-error', message: __('Agent non autorisé.'));
+
+            return;
+        }
+
+        // Vérifier que c'est un agent
+        if ($agent->role?->slug !== 'agent') {
+            $this->dispatch('mfa-error', message: __('Seuls les agents peuvent avoir leur MFA désactivé depuis cette page.'));
+
+            return;
+        }
+
+        $disableTwoFactorAuthentication($agent);
+
+        $this->resetPage();
+        $this->dispatch('mfa-disabled', message: __('MFA désactivé avec succès pour cet agent.'));
     }
 
     public function getAgentStats(User $agent): array
@@ -121,6 +184,9 @@ new class extends Component
                             {{ __('Statut') }}
                         </th>
                         <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                            {{ __('MFA') }}
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                             {{ __('Leads assignés') }}
                         </th>
                         <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
@@ -154,6 +220,17 @@ new class extends Component
                                     </span>
                                 @endif
                             </td>
+                            <td class="whitespace-nowrap px-6 py-4 text-sm">
+                                @if ($agent->hasEnabledTwoFactorAuthentication())
+                                    <span class="inline-flex rounded-full bg-orange-100 px-2 py-1 text-xs font-semibold text-orange-800 dark:bg-orange-900/20 dark:text-orange-300">
+                                        {{ __('Activé') }}
+                                    </span>
+                                @else
+                                    <span class="inline-flex rounded-full bg-neutral-200 px-2 py-1 text-xs font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+                                        {{ __('Désactivé') }}
+                                    </span>
+                                @endif
+                            </td>
                             <td class="whitespace-nowrap px-6 py-4 text-sm text-neutral-600 dark:text-neutral-400">
                                 {{ $agent->assigned_leads_count }}
                             </td>
@@ -178,10 +255,21 @@ new class extends Component
                                     >
                                         {{ __('Modifier') }}
                                     </flux:button>
+                                    @if ($agent->hasEnabledTwoFactorAuthentication())
+                                        <flux:button
+                                            wire:click="disableMfa({{ $agent->id }})"
+                                            wire:confirm="{{ __('Êtes-vous sûr de vouloir désactiver l\'authentification à deux facteurs pour cet agent ?') }}"
+                                            variant="ghost"
+                                            size="sm"
+                                            icon="shield-exclamation"
+                                        >
+                                            {{ __('Désactiver MFA') }}
+                                        </flux:button>
+                                    @endif
                                     <flux:button
                                         wire:click="toggleStatus({{ $agent->id }})"
                                         wire:confirm="{{ $agent->is_active ? __('Désactiver cet agent ? Les leads en cours doivent être réassignés.') : __('Réactiver cet agent ?') }}"
-                                        variant="{{ $agent->is_active ? 'danger' : 'success' }}"
+                                        variant="{{ $agent->is_active ? 'danger' : 'primary' }}"
                                         size="sm"
                                     >
                                         {{ $agent->is_active ? __('Désactiver') : __('Réactiver') }}
@@ -191,7 +279,7 @@ new class extends Component
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-6 py-12 text-center text-sm text-neutral-500 dark:text-neutral-400">
+                            <td colspan="6" class="px-6 py-12 text-center text-sm text-neutral-500 dark:text-neutral-400">
                                 {{ __('Aucun agent trouvé') }}
                             </td>
                         </tr>
@@ -207,4 +295,50 @@ new class extends Component
         @endif
     </div>
 </div>
+
+@script
+<script>
+    $wire.on('mfa-disabled', (event) => {
+        $dispatch('notify', {
+            message: event.message || 'MFA désactivé avec succès.',
+            type: 'success'
+        });
+    });
+
+    $wire.on('mfa-error', (event) => {
+        $dispatch('notify', {
+            message: event.message || 'Erreur lors de la désactivation du MFA.',
+            type: 'danger'
+        });
+    });
+
+    $wire.on('agent-activated', () => {
+        $dispatch('notify', {
+            message: 'Agent activé avec succès.',
+            type: 'success'
+        });
+    });
+
+    $wire.on('agent-deactivated', () => {
+        $dispatch('notify', {
+            message: 'Agent désactivé avec succès.',
+            type: 'success'
+        });
+    });
+
+    $wire.on('agent-has-leads', () => {
+        $dispatch('notify', {
+            message: 'Impossible de désactiver cet agent car il a des leads en cours. Réassignez-les d\'abord.',
+            type: 'warning'
+        });
+    });
+
+    $wire.on('agent-error', (event) => {
+        $dispatch('notify', {
+            message: event.message || 'Erreur lors de la modification de l\'agent.',
+            type: 'danger'
+        });
+    });
+</script>
+@endscript
 

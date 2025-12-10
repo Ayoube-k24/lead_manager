@@ -40,6 +40,16 @@ new class extends Component
         $this->resetPage();
     }
 
+    public function updatingTagsFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingTagsMode(): void
+    {
+        $this->resetPage();
+    }
+
     public function getLeadsProperty()
     {
         $user = Auth::user();
@@ -106,6 +116,17 @@ new class extends Component
         return Tag::whereHas('leads', fn ($q) => $q->where('assigned_to', $user->id))
             ->orderBy('name')
             ->get();
+    }
+
+    public function toggleTag(int $tagId): void
+    {
+        $tagId = (int) $tagId;
+        if (in_array($tagId, $this->tagsFilter)) {
+            $this->tagsFilter = array_values(array_diff($this->tagsFilter, [$tagId]));
+        } else {
+            $this->tagsFilter = array_merge($this->tagsFilter, [$tagId]);
+        }
+        $this->resetPage();
     }
 }; ?>
 
@@ -296,13 +317,7 @@ new class extends Component
                             $isSelected = in_array($tag->id, $tagsFilter);
                         @endphp
                         <button
-                            wire:click="
-                                @if($isSelected)
-                                    $set('tagsFilter', array_values(array_diff($tagsFilter, [{{ $tag->id }}])))
-                                @else
-                                    $set('tagsFilter', array_merge($tagsFilter, [{{ $tag->id }}]))
-                                @endif
-                            "
+                            wire:click="toggleTag({{ $tag->id }})"
                             type="button"
                             class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-all {{ $isSelected ? 'ring-2 ring-offset-2' : '' }}"
                             style="{{ $isSelected ? 'background-color: ' . $tag->color . '20; color: ' . $tag->color . '; ring-color: ' . $tag->color : 'background-color: #f3f4f6; color: #6b7280' }}"

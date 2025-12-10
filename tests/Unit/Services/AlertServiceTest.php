@@ -28,6 +28,7 @@ describe('AlertService', function () {
 
             expect($alert)->toBeInstanceOf(Alert::class)
                 ->and($alert->user_id)->toBe($user->id)
+                ->and($alert->role_slug)->toBe($user->role?->slug)
                 ->and($alert->type)->toBe('lead_stale')
                 ->and($alert->is_active)->toBeTrue()
                 ->and($alert->notification_channels)->toBe(['email', 'in_app']);
@@ -157,6 +158,7 @@ describe('AlertService', function () {
 
             $alert = Alert::factory()->create([
                 'user_id' => $user->id,
+                'role_slug' => $user->role?->slug,
                 'is_active' => true,
                 'type' => 'lead_stale',
                 'conditions' => ['hours' => 24],
@@ -175,10 +177,12 @@ describe('AlertService', function () {
 
             $activeAlert = Alert::factory()->create([
                 'user_id' => $user->id,
+                'role_slug' => $user->role?->slug,
                 'is_active' => true,
             ]);
             $inactiveAlert = Alert::factory()->create([
                 'user_id' => $user->id,
+                'role_slug' => $user->role?->slug,
                 'is_active' => false,
             ]);
 
@@ -186,6 +190,30 @@ describe('AlertService', function () {
 
             // May or may not trigger, but should only check active ones
             expect($triggered->pluck('id'))->not->toContain($inactiveAlert->id);
+        });
+
+        test('checks alerts for specific role', function () {
+            $role = Role::firstOrCreate(['slug' => 'supervisor'], ['name' => 'Supervisor']);
+            $user = User::factory()->create(['role_id' => $role->id]);
+
+            Lead::factory()->count(5)->create([
+                'status' => 'pending_email',
+                'updated_at' => now()->subHours(25),
+            ]);
+
+            $alert = Alert::factory()->create([
+                'user_id' => $user->id,
+                'role_slug' => 'supervisor',
+                'is_active' => true,
+                'type' => 'lead_stale',
+                'conditions' => ['hours' => 24],
+                'threshold' => 3.0,
+            ]);
+
+            $triggered = $this->service->checkAlertsForRole('supervisor');
+
+            expect($triggered->count())->toBe(1)
+                ->and($triggered->first()->id)->toBe($alert->id);
         });
     });
 });

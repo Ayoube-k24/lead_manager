@@ -34,6 +34,7 @@
                         <flux:navlist.item icon="document-text" :href="route('admin.forms')" :current="request()->routeIs('admin.forms*')" wire:navigate>{{ __('Formulaires') }}</flux:navlist.item>
                         <flux:navlist.item icon="envelope" :href="route('admin.smtp-profiles')" :current="request()->routeIs('admin.smtp-profiles*')" wire:navigate>{{ __('Profils SMTP') }}</flux:navlist.item>
                         <flux:navlist.item icon="document-duplicate" :href="route('admin.email-templates')" :current="request()->routeIs('admin.email-templates*')" wire:navigate>{{ __('Templates d\'email') }}</flux:navlist.item>
+                        <flux:navlist.item icon="envelope-open" :href="route('admin.email-subjects')" :current="request()->routeIs('admin.email-subjects*')" wire:navigate>{{ __('Sujets d\'email') }}</flux:navlist.item>
                         <flux:navlist.item icon="tag" :href="route('admin.tags')" :current="request()->routeIs('admin.tags*')" wire:navigate>{{ __('Tags') }}</flux:navlist.item>
                         <flux:navlist.item icon="check-circle" :href="route('admin.statuses')" :current="request()->routeIs('admin.statuses*')" wire:navigate>{{ __('Statuts') }}</flux:navlist.item>
                         <flux:navlist.item icon="chart-bar" :href="route('admin.scoring')" :current="request()->routeIs('admin.scoring*')" wire:navigate>{{ __('Scoring') }}</flux:navlist.item>
@@ -51,6 +52,12 @@
                         <flux:navlist.item icon="globe-alt" :href="route('admin.webhooks')" :current="request()->routeIs('admin.webhooks*')" wire:navigate>{{ __('Webhooks') }}</flux:navlist.item>
                         <flux:navlist.item icon="arrow-down-tray" :href="route('admin.mailwizz.index')" :current="request()->routeIs('admin.mailwizz*')" wire:navigate>{{ __('MailWizz') }}</flux:navlist.item>
                     </flux:navlist.group>
+
+                    <!-- Paramètres -->
+                    <flux:navlist.group :heading="__('Paramètres')" class="grid">
+                        <flux:navlist.item icon="cog-6-tooth" :href="route('admin.settings')" :current="request()->routeIs('admin.settings*')" wire:navigate>{{ __('Paramètres') }}</flux:navlist.item>
+                        <flux:navlist.item icon="bell" :href="route('admin.alerts-management')" :current="request()->routeIs('admin.alerts-management*')" wire:navigate>{{ __('Gestion des Alertes') }}</flux:navlist.item>
+                    </flux:navlist.group>
                 @endif
 
                 @if (auth()->user()?->role?->slug === 'call_center_owner')
@@ -63,6 +70,7 @@
                     <!-- Équipe -->
                     <flux:navlist.group :heading="__('Équipe')" class="grid">
                         <flux:navlist.item icon="users" :href="route('owner.agents')" :current="request()->routeIs('owner.agents*')" wire:navigate>{{ __('Agents') }}</flux:navlist.item>
+                        <flux:navlist.item icon="key" :href="route('owner.access-management')" :current="request()->routeIs('owner.access-management*')" wire:navigate>{{ __('Gestion des Accès') }}</flux:navlist.item>
                     </flux:navlist.group>
 
                     <!-- Configuration -->
@@ -74,6 +82,11 @@
                     <!-- Analytics -->
                     <flux:navlist.group :heading="__('Analytics')" class="grid">
                         <flux:navlist.item icon="chart-bar" :href="route('owner.statistics')" :current="request()->routeIs('owner.statistics*')" wire:navigate>{{ __('Statistiques') }}</flux:navlist.item>
+                    </flux:navlist.group>
+
+                    <!-- Paramètres -->
+                    <flux:navlist.group :heading="__('Paramètres')" class="grid">
+                        <flux:navlist.item icon="bell-alert" :href="route('owner.alerts')" :current="request()->routeIs('owner.alerts*')" wire:navigate>{{ __('Alertes') }}</flux:navlist.item>
                     </flux:navlist.group>
                 @endif
 
@@ -92,6 +105,11 @@
                     <flux:navlist.group :heading="__('Analytics')" class="grid">
                         <flux:navlist.item icon="chart-bar" :href="route('supervisor.statistics')" :current="request()->routeIs('supervisor.statistics*')" wire:navigate>{{ __('Statistiques') }}</flux:navlist.item>
                     </flux:navlist.group>
+
+                    <!-- Paramètres -->
+                    <flux:navlist.group :heading="__('Paramètres')" class="grid">
+                        <flux:navlist.item icon="bell-alert" :href="route('supervisor.alerts')" :current="request()->routeIs('supervisor.alerts*')" wire:navigate>{{ __('Alertes') }}</flux:navlist.item>
+                    </flux:navlist.group>
                 @endif
 
                 @if (auth()->user()?->role?->slug === 'agent')
@@ -100,12 +118,12 @@
                         <flux:navlist.item icon="user-group" :href="route('agent.leads')" :current="request()->routeIs('agent.leads*')" wire:navigate>{{ __('Mes Leads') }}</flux:navlist.item>
                         <flux:navlist.item icon="calendar" :href="route('agent.reminders.calendar')" :current="request()->routeIs('agent.reminders*')" wire:navigate>{{ __('Calendrier des Rappels') }}</flux:navlist.item>
                     </flux:navlist.group>
-                @endif
 
-                <!-- Paramètres -->
-                <flux:navlist.group :heading="__('Paramètres')" class="grid">
-                    <flux:navlist.item icon="bell" :href="route('settings.alerts')" :current="request()->routeIs('settings.alerts*')" wire:navigate>{{ __('Alertes') }}</flux:navlist.item>
-                </flux:navlist.group>
+                    <!-- Paramètres -->
+                    <flux:navlist.group :heading="__('Paramètres')" class="grid">
+                        <flux:navlist.item icon="bell-alert" :href="route('agent.alerts')" :current="request()->routeIs('agent.alerts*')" wire:navigate>{{ __('Alertes') }}</flux:navlist.item>
+                    </flux:navlist.group>
+                @endif
             </flux:navlist>
 
             <flux:spacer />
@@ -210,5 +228,6 @@
         {{ $slot }}
 
         @fluxScripts
+        @stack('scripts')
     </body>
 </html>

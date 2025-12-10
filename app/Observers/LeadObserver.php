@@ -21,7 +21,34 @@ class LeadObserver
      */
     public function updated(Lead $lead): void
     {
-        $this->attemptDistribution($lead);
+        // Check if distribution timing conditions are met
+        if (! $lead->assigned_to) {
+            // Load call center to check distribution_timing
+            if (! $lead->relationLoaded('callCenter')) {
+                $lead->load('callCenter');
+            }
+
+            if ($lead->callCenter) {
+                $distributionTiming = $lead->callCenter->distribution_timing ?? 'after_email_confirmation';
+                $status = $lead->status ?? $lead->getStatusEnum()->value ?? null;
+                $changes = $lead->getChanges();
+
+                // Check if status changed to a distributable state
+                $statusChanged = isset($changes['status']);
+                $emailConfirmed = isset($changes['email_confirmed_at']);
+
+                $shouldDistribute = match ($distributionTiming) {
+                    'after_registration' => $statusChanged && $status === 'pending_email',
+                    'after_email_confirmation' => ($statusChanged && $status === 'email_confirmed') || ($emailConfirmed && $status === 'email_confirmed'),
+                    default => ($statusChanged && $status === 'email_confirmed') || ($emailConfirmed && $status === 'email_confirmed'),
+                };
+
+                if ($shouldDistribute) {
+                    $this->attemptDistribution($lead);
+                }
+            }
+        }
+
         $this->recalculateScoreIfNeeded($lead, 'updated');
     }
 
@@ -30,11 +57,9 @@ class LeadObserver
      */
     public function saved(Lead $lead): void
     {
-        // Only attempt distribution if status is email_confirmed
-        // This prevents unnecessary processing during initial creation
         // Check both the status attribute and getStatusEnum() for compatibility
         $status = $lead->status ?? $lead->getStatusEnum()->value ?? null;
-        
+
         Log::debug('Observer: saved() called', [
             'lead_id' => $lead->id,
             'status' => $lead->status,
@@ -43,9 +68,36 @@ class LeadObserver
             'assigned_to' => $lead->assigned_to,
             'wasRecentlyCreated' => $lead->wasRecentlyCreated,
         ]);
-        
-        if ($status === 'email_confirmed' && ! $lead->assigned_to) {
-            $this->attemptDistribution($lead);
+
+        // Only attempt distribution if lead is not assigned
+        if (! $lead->assigned_to) {
+            // Load call center to check distribution_timing
+            if (! $lead->relationLoaded('callCenter')) {
+                $lead->load('callCenter');
+            }
+
+            // If lead doesn't have call_center_id, try to get it from the form
+            if (! $lead->call_center_id && $lead->form && $lead->form->call_center_id) {
+                $lead->call_center_id = $lead->form->call_center_id;
+                $lead->saveQuietly();
+                $lead->refresh();
+                $lead->load('callCenter');
+            }
+
+            if ($lead->callCenter) {
+                $distributionTiming = $lead->callCenter->distribution_timing ?? 'after_email_confirmation';
+
+                // Check if distribution should happen based on timing setting
+                $shouldDistribute = match ($distributionTiming) {
+                    'after_registration' => $lead->wasRecentlyCreated && $status === 'pending_email',
+                    'after_email_confirmation' => $status === 'email_confirmed',
+                    default => $status === 'email_confirmed',
+                };
+
+                if ($shouldDistribute) {
+                    $this->attemptDistribution($lead);
+                }
+            }
         }
     }
 
@@ -63,9 +115,8 @@ class LeadObserver
             'getChanges' => $lead->getChanges(),
         ]);
 
-        // Only process if status is email_confirmed and lead is not assigned
-        // In the updated() event, $lead->status already has the new value
-        if ($lead->status === 'email_confirmed' && ! $lead->assigned_to) {
+        // Only process if lead is not assigned
+        if (! $lead->assigned_to) {
             // Ensure we have the necessary relationships loaded
             if (! $lead->relationLoaded('form')) {
                 $lead->load('form');
@@ -94,7 +145,7 @@ class LeadObserver
 
             // Only distribute if we have a call center
             if ($lead->call_center_id) {
-                // Always reload call center from database to get latest distribution_method
+                // Always reload call center from database to get latest distribution_method and distribution_timing
                 $callCenter = \App\Models\CallCenter::find($lead->call_center_id);
 
                 if (! $callCenter) {
@@ -117,11 +168,33 @@ class LeadObserver
                     return;
                 }
 
+                // Check distribution timing
+                $distributionTiming = $callCenter->distribution_timing ?? 'after_email_confirmation';
+                $status = $lead->status ?? $lead->getStatusEnum()->value ?? null;
+
+                $shouldDistribute = match ($distributionTiming) {
+                    'after_registration' => $status === 'pending_email',
+                    'after_email_confirmation' => $status === 'email_confirmed',
+                    default => $status === 'email_confirmed',
+                };
+
+                if (! $shouldDistribute) {
+                    Log::info('Observer: Skipping distribution (timing not met)', [
+                        'lead_id' => $lead->id,
+                        'call_center_id' => $lead->call_center_id,
+                        'status' => $status,
+                        'distribution_timing' => $distributionTiming,
+                    ]);
+
+                    return;
+                }
+
                 Log::info('Observer: Attempting automatic distribution', [
                     'lead_id' => $lead->id,
                     'call_center_id' => $lead->call_center_id,
                     'status' => $lead->status,
                     'distribution_method' => $callCenter?->distribution_method ?? 'unknown',
+                    'distribution_timing' => $distributionTiming,
                 ]);
 
                 try {
@@ -146,17 +219,17 @@ class LeadObserver
                                 'status' => 'pending_call',
                                 'updated_at' => now(),
                             ]);
-                        
+
                         // Reload the lead to get the updated values
                         $lead->refresh();
-                        
+
                         Log::info('Observer: Lead assigned and marked as pending_call', [
                             'lead_id' => $lead->id,
                             'agent_id' => $agent->id,
                             'assigned_to' => $lead->assigned_to,
                             'status' => $lead->status,
                         ]);
-                        
+
                         // Dispatch LeadAssigned event manually
                         event(new LeadAssigned($lead, $agent));
                     } else {

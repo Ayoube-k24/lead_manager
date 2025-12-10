@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\Form;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -24,6 +23,7 @@ class CallCenter extends Model
         'description',
         'owner_id',
         'distribution_method',
+        'distribution_timing',
         'is_active',
     ];
 

@@ -1,17 +1,6 @@
 <?php
 
 return [
-    /*
-    |--------------------------------------------------------------------------
-    | Lead Scoring Configuration
-    |--------------------------------------------------------------------------
-    |
-    | This file contains the configuration for the lead scoring system.
-    | You can adjust the weights of different factors to customize
-    | how leads are scored.
-    |
-    */
-
     'factors' => [
         'form_source' => [
             'weight' => 10,
@@ -44,31 +33,11 @@ return [
             'description' => 'Score basé sur l\'heure de soumission et le jour de la semaine',
         ],
     ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Score Thresholds
-    |--------------------------------------------------------------------------
-    |
-    | Define the thresholds for different priority levels.
-    |
-    */
-
     'thresholds' => [
         'high' => 80,
         'medium' => 60,
         'low' => 0,
     ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Auto Recalculate
-    |--------------------------------------------------------------------------
-    |
-    | Automatically recalculate scores when certain events occur.
-    |
-    */
-
     'auto_recalculate' => [
         'on_creation' => true,
         'on_email_confirmation' => true,

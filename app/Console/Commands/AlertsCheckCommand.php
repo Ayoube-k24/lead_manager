@@ -26,22 +26,43 @@ class AlertsCheckCommand extends Command
      */
     public function handle(): int
     {
-        $this->info('Vérification des alertes actives...');
+        $this->info('Vérification des alertes actives par rôle...');
 
         $service = app(AlertService::class);
-        $triggered = $service->checkAlerts();
 
-        if ($triggered->isEmpty()) {
+        // Get all unique role slugs from alerts
+        $roleSlugs = \App\Models\Alert::where('is_active', true)
+            ->distinct()
+            ->pluck('role_slug')
+            ->filter();
+
+        if ($roleSlugs->isEmpty()) {
+            $this->info('Aucune alerte active trouvée.');
+
+            return Command::SUCCESS;
+        }
+
+        $totalTriggered = 0;
+
+        foreach ($roleSlugs as $roleSlug) {
+            $this->line("Vérification des alertes pour le rôle: {$roleSlug}");
+            $triggered = $service->checkAlertsForRole($roleSlug);
+
+            if ($triggered->isNotEmpty()) {
+                $totalTriggered += $triggered->count();
+                foreach ($triggered as $alert) {
+                    $this->line("  - {$alert->name} (Type: {$alert->type}, Rôle: {$alert->role_slug})");
+                }
+            }
+        }
+
+        if ($totalTriggered === 0) {
             $this->info('Aucune alerte déclenchée.');
 
             return Command::SUCCESS;
         }
 
-        $this->info("{$triggered->count()} alerte(s) déclenchée(s).");
-
-        foreach ($triggered as $alert) {
-            $this->line("  - {$alert->name} (Type: {$alert->type}, Utilisateur: {$alert->user->name})");
-        }
+        $this->info("{$totalTriggered} alerte(s) déclenchée(s) au total.");
 
         return Command::SUCCESS;
     }

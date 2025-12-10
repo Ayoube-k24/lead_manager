@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Actions\Fortify\AuthenticateUser;
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\CustomLoginResponse;
+use App\Actions\Fortify\CustomLogoutResponse;
 use App\Actions\Fortify\ResetUserPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -75,13 +76,18 @@ class FortifyServiceProvider extends ServiceProvider
     }
 
     /**
-     * Configure redirects after authentication.
+     * Configure redirects after authentication and logout.
      */
     private function configureRedirects(): void
     {
         $this->app->singleton(
             \Laravel\Fortify\Contracts\LoginResponse::class,
             CustomLoginResponse::class
+        );
+
+        $this->app->singleton(
+            \Laravel\Fortify\Contracts\LogoutResponse::class,
+            CustomLogoutResponse::class
         );
     }
 }

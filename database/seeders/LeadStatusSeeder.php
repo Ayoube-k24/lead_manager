@@ -58,56 +58,28 @@ class LeadStatusSeeder extends Seeder
                 'order' => 3,
             ],
             [
-                'enum' => LeadStatusEnum::Confirmed,
+                'enum' => LeadStatusEnum::NoAnswer,
                 'order' => 4,
             ],
             [
-                'enum' => LeadStatusEnum::Rejected,
+                'enum' => LeadStatusEnum::Busy,
                 'order' => 5,
             ],
             [
-                'enum' => LeadStatusEnum::CallbackPending,
+                'enum' => LeadStatusEnum::WrongNumber,
                 'order' => 6,
             ],
             [
-                'enum' => LeadStatusEnum::NoAnswer,
+                'enum' => LeadStatusEnum::NotInterested,
                 'order' => 7,
             ],
             [
-                'enum' => LeadStatusEnum::Busy,
+                'enum' => LeadStatusEnum::CallbackPending,
                 'order' => 8,
             ],
             [
-                'enum' => LeadStatusEnum::WrongNumber,
-                'order' => 9,
-            ],
-            [
-                'enum' => LeadStatusEnum::NotInterested,
-                'order' => 10,
-            ],
-            [
-                'enum' => LeadStatusEnum::Qualified,
-                'order' => 11,
-            ],
-            [
-                'enum' => LeadStatusEnum::Converted,
-                'order' => 12,
-            ],
-            [
-                'enum' => LeadStatusEnum::FollowUp,
-                'order' => 13,
-            ],
-            [
-                'enum' => LeadStatusEnum::AppointmentScheduled,
-                'order' => 14,
-            ],
-            [
                 'enum' => LeadStatusEnum::QuoteSent,
-                'order' => 15,
-            ],
-            [
-                'enum' => LeadStatusEnum::DoNotCall,
-                'order' => 16,
+                'order' => 9,
             ],
         ];
 

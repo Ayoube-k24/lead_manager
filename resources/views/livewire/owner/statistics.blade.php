@@ -72,7 +72,15 @@ new class extends Component
             <h2 class="mb-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
                 {{ __('Leads créés (30 derniers jours)') }}
             </h2>
-            <canvas id="leadsOverTimeChart" height="100"></canvas>
+            @if (empty($leadsOverTime))
+                <div class="flex h-32 items-center justify-center text-sm text-neutral-500 dark:text-neutral-400">
+                    {{ __('Aucune donnée disponible') }}
+                </div>
+            @else
+                <div class="relative h-64">
+                    <canvas id="leadsOverTimeChart"></canvas>
+                </div>
+            @endif
         </div>
 
         <!-- Performance des agents -->
@@ -80,7 +88,15 @@ new class extends Component
             <h2 class="mb-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
                 {{ __('Performance des agents') }}
             </h2>
-            <canvas id="agentPerformanceChart" height="100"></canvas>
+            @if (empty($agentPerformance))
+                <div class="flex h-32 items-center justify-center text-sm text-neutral-500 dark:text-neutral-400">
+                    {{ __('Aucune donnée disponible') }}
+                </div>
+            @else
+                <div class="relative h-64">
+                    <canvas id="agentPerformanceChart"></canvas>
+                </div>
+            @endif
         </div>
     </div>
 
@@ -213,69 +229,190 @@ new class extends Component
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
-    // Leads over time chart
-    const leadsOverTimeCtx = document.getElementById('leadsOverTimeChart');
-    if (leadsOverTimeCtx) {
-        new Chart(leadsOverTimeCtx, {
-            type: 'line',
-            data: {
-                labels: @json(array_column($leadsOverTime, 'date')),
-                datasets: [{
-                    label: '{{ __('Leads créés') }}',
-                    data: @json(array_column($leadsOverTime, 'count')),
-                    borderColor: 'rgb(59, 130, 246)',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    tension: 0.4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true
-                    }
-                }
+    function initializeCharts() {
+        // Wait for Chart.js to be available
+        if (typeof Chart === 'undefined') {
+            console.error('Chart.js is not loaded');
+            return;
+        }
+
+        // Leads over time chart
+        const leadsOverTimeCtx = document.getElementById('leadsOverTimeChart');
+        if (leadsOverTimeCtx) {
+            // Destroy existing chart if it exists
+            if (leadsOverTimeCtx.chart) {
+                leadsOverTimeCtx.chart.destroy();
             }
-        });
+            
+            @php
+                $leadsOverTimeArray = is_array($leadsOverTime) ? $leadsOverTime : [];
+                $labels = array_column($leadsOverTimeArray, 'date');
+                $counts = array_column($leadsOverTimeArray, 'count');
+                // Ensure we have valid arrays
+                $labels = $labels !== false ? $labels : [];
+                $counts = $counts !== false ? $counts : [];
+            @endphp
+            
+            try {
+                leadsOverTimeCtx.chart = new Chart(leadsOverTimeCtx, {
+                    type: 'line',
+                    data: {
+                        labels: @json($labels),
+                        datasets: [{
+                            label: '{{ __('Leads créés') }}',
+                            data: @json($counts),
+                            borderColor: 'rgb(59, 130, 246)',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 3,
+                            pointHoverRadius: 5,
+                            pointBackgroundColor: 'rgb(59, 130, 246)',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            intersect: false,
+                            mode: 'index'
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                enabled: true,
+                                mode: 'index',
+                                intersect: false
+                            }
+                        },
+                        scales: {
+                            x: {
+                                display: true,
+                                grid: {
+                                    display: false
+                                }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    stepSize: 1
+                                },
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.1)'
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error creating leads over time chart:', error);
+            }
+        }
+
+        // Agent performance chart
+        const agentPerformanceCtx = document.getElementById('agentPerformanceChart');
+        if (agentPerformanceCtx) {
+            // Destroy existing chart if it exists
+            if (agentPerformanceCtx.chart) {
+                agentPerformanceCtx.chart.destroy();
+            }
+            
+            @php
+                $agentPerformanceArray = is_array($agentPerformance) ? $agentPerformance : [];
+                $agentLabels = [];
+                $conversionRates = [];
+                foreach ($agentPerformanceArray as $item) {
+                    if (isset($item['agent']['name'])) {
+                        $agentLabels[] = $item['agent']['name'];
+                    } elseif (isset($item['agent']->name)) {
+                        $agentLabels[] = $item['agent']->name;
+                    } else {
+                        $agentLabels[] = '';
+                    }
+                    $conversionRates[] = $item['conversion_rate'] ?? 0;
+                }
+            @endphp
+
+            try {
+                agentPerformanceCtx.chart = new Chart(agentPerformanceCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: @json($agentLabels),
+                        datasets: [{
+                            label: '{{ __('Taux de conversion (%)') }}',
+                            data: @json($conversionRates),
+                            backgroundColor: 'rgba(34, 197, 94, 0.5)',
+                            borderColor: 'rgb(34, 197, 94)',
+                            borderWidth: 2,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                enabled: true
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: {
+                                    display: false
+                                }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                ticks: {
+                                    callback: function(value) {
+                                        return value + '%';
+                                    }
+                                },
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.1)'
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error creating agent performance chart:', error);
+            }
+        }
     }
 
-    // Agent performance chart
-    const agentPerformanceCtx = document.getElementById('agentPerformanceChart');
-    if (agentPerformanceCtx) {
-        new Chart(agentPerformanceCtx, {
-            type: 'bar',
-            data: {
-                labels: @json(array_column($agentPerformance, 'agent.name')),
-                datasets: [{
-                    label: '{{ __('Taux de conversion (%)') }}',
-                    data: @json(array_column($agentPerformance, 'conversion_rate')),
-                    backgroundColor: 'rgba(34, 197, 94, 0.5)',
-                    borderColor: 'rgb(34, 197, 94)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100
-                    }
-                }
+    // Initialize when DOM is ready
+    function waitForChartJS() {
+        if (typeof Chart !== 'undefined') {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initializeCharts);
+            } else {
+                // DOM already loaded, wait a bit for Livewire to render
+                setTimeout(initializeCharts, 200);
             }
-        });
+        } else {
+            setTimeout(waitForChartJS, 50);
+        }
     }
+
+    waitForChartJS();
+
+    // Re-initialize after Livewire updates
+    document.addEventListener('livewire:init', function() {
+        setTimeout(initializeCharts, 200);
+    });
+    
+    document.addEventListener('livewire:update', function() {
+        setTimeout(initializeCharts, 200);
+    });
 </script>
 
