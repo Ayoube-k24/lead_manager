@@ -43,3 +43,4 @@ class AuthenticateUser
         return $user;
     }
 }
+

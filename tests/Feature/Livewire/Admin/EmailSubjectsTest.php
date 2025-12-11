@@ -131,3 +131,4 @@ describe('Admin Email Subjects', function () {
             ->assertDontSee('Proposition assurance');
     });
 });
+

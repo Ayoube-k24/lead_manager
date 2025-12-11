@@ -40,3 +40,4 @@ describe('VerifyCsrfToken Middleware', function () {
         expect($response->status())->not->toBe(419);
     });
 });
+

@@ -15,3 +15,4 @@ describe('LeadStatusUpdated Event', function () {
             ->and($event->newStatus)->toBe('confirmed');
     });
 });
+

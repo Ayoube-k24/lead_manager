@@ -30,3 +30,4 @@ curl -X POST "${API_URL}" \
 echo ""
 echo "Test terminé!"
 
+

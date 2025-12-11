@@ -1157,18 +1157,18 @@ new class extends Component
     <!-- Modal d'envoi d'email - Modal personnalisé pour contrôle total de la taille -->
     @if ($showEmailModal)
         <div 
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4"
             wire:click="closeEmailModal"
             wire:key="email-modal-backdrop"
         >
             <div 
-                class="relative w-[95vw] h-[95vh] max-w-[95vw] max-h-[95vh] min-w-[95vw] sm:min-w-[600px] md:min-w-[800px] lg:min-w-[1200px] xl:min-w-[1400px] 2xl:min-w-[1600px] bg-white dark:bg-neutral-800 rounded-lg shadow-xl flex flex-col overflow-hidden m-2 sm:m-4 md:m-6"
+                class="relative w-full h-full sm:w-[95vw] sm:h-[95vh] sm:max-w-[95vw] sm:max-h-[95vh] md:max-w-[90vw] lg:max-w-[85vw] xl:max-w-[1400px] bg-white dark:bg-neutral-800 rounded-lg shadow-xl flex flex-col overflow-hidden"
                 wire:click.stop
                 wire:key="email-modal-content"
             >
-                <form wire:submit="sendEmail" class="flex flex-col h-full overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
-                    <!-- En-tête du modal avec bouton de fermeture -->
-                    <div class="flex items-start sm:items-center justify-between mb-3 sm:mb-4 pb-3 sm:pb-4 border-b border-neutral-200 dark:border-neutral-700 flex-shrink-0">
+                <form wire:submit="sendEmail" class="flex flex-col h-full overflow-hidden">
+                    <!-- En-tête du modal avec bouton de fermeture - Fixe en haut -->
+                    <div class="flex items-start sm:items-center justify-between p-4 sm:p-6 pb-3 sm:pb-4 border-b border-neutral-200 dark:border-neutral-700 flex-shrink-0">
                         <div class="flex-1 min-w-0 pr-2">
                             <h2 class="text-base sm:text-lg font-semibold text-neutral-900 dark:text-neutral-100">
                                 {{ __('Envoyer un email') }}
@@ -1187,6 +1187,9 @@ new class extends Component
                             </svg>
                         </button>
                     </div>
+                    
+                    <!-- Contenu scrollable -->
+                    <div class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
 
             @if (session('email-error'))
                 <flux:callout variant="danger" icon="exclamation-circle">
@@ -1231,7 +1234,7 @@ new class extends Component
                 </div>
             @endif
 
-            <flux:field>
+            <flux:field class="flex-1 flex flex-col min-h-0">
                 <div class="mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
                     <flux:label class="mb-0">{{ __('Contenu de l\'email') }} <span class="text-red-500">*</span></flux:label>
                     <div class="flex items-center gap-2 flex-wrap">
@@ -1266,8 +1269,8 @@ new class extends Component
                 </div>
                 
                     @if ($emailEditorMode === 'visual')
-                        <div wire:ignore class="email-visual-editor-container w-full flex-1 flex flex-col">
-                            <div id="emailBodyEditor" class="w-full flex-1 border border-neutral-200 dark:border-neutral-700 rounded-lg"></div>
+                        <div wire:ignore class="email-visual-editor-container w-full flex-1 flex flex-col min-h-[400px] sm:min-h-[500px] md:min-h-[600px]">
+                            <div id="emailBodyEditor" class="w-full flex-1 border border-neutral-200 dark:border-neutral-700 rounded-lg" style="min-height: 400px;"></div>
                             <textarea id="emailBodyHidden" wire:model="emailBody" class="hidden"></textarea>
                         </div>
                     @else
@@ -1304,8 +1307,10 @@ new class extends Component
                 <flux:description>{{ __('Taille maximale : 10 Mo') }}</flux:description>
                 <flux:error name="emailAttachment" />
             </flux:field>
-
-                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3 pt-3 sm:pt-4 border-t border-neutral-200 dark:border-neutral-700 flex-shrink-0">
+                    </div>
+                    
+                    <!-- Boutons fixes en bas -->
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3 p-4 sm:p-6 pt-3 sm:pt-4 border-t border-neutral-200 dark:border-neutral-700 flex-shrink-0 bg-white dark:bg-neutral-800">
                         <flux:button type="button" wire:click="closeEmailModal" variant="ghost" class="w-full sm:w-auto">
                             {{ __('Annuler') }}
                         </flux:button>
@@ -1398,40 +1403,41 @@ new class extends Component
             .email-visual-editor-container {
                 position: relative;
                 width: 100%;
-                height: 100%;
-                min-height: 500px;
+                flex: 1 1 auto;
+                display: flex;
+                flex-direction: column;
+                min-height: 400px;
             }
             
             @media (min-width: 640px) {
                 .email-visual-editor-container {
-                    min-height: 600px;
+                    min-height: 500px;
                 }
             }
             
             @media (min-width: 1024px) {
                 .email-visual-editor-container {
-                    min-height: 700px;
+                    min-height: 600px;
                 }
             }
             
             #emailBodyEditor {
                 background: white;
                 width: 100%;
-                min-height: 500px;
-                height: 500px;
+                flex: 1 1 auto;
+                display: block !important;
+                min-height: 400px;
             }
             
             @media (min-width: 640px) {
                 #emailBodyEditor {
-                    min-height: 600px;
-                    height: 600px;
+                    min-height: 500px;
                 }
             }
             
             @media (min-width: 1024px) {
                 #emailBodyEditor {
-                    min-height: 700px;
-                    height: 700px;
+                    min-height: 600px;
                 }
             }
             
@@ -1481,19 +1487,36 @@ new class extends Component
             
             /* Ajuster la hauteur de l'éditeur GrapesJS */
             .gjs-editor {
-                min-height: 500px;
+                min-height: 400px;
                 height: 100%;
+                display: flex;
+                flex-direction: column;
             }
             
             @media (min-width: 640px) {
                 .gjs-editor {
-                    min-height: 600px;
+                    min-height: 500px;
                 }
             }
             
             @media (min-width: 1024px) {
                 .gjs-editor {
-                    min-height: 700px;
+                    min-height: 600px;
+                }
+            }
+            
+            /* Responsive adjustments for modal */
+            @media (max-width: 640px) {
+                .email-visual-editor-container {
+                    min-height: 350px;
+                }
+                
+                #emailBodyEditor {
+                    min-height: 350px;
+                }
+                
+                .gjs-editor {
+                    min-height: 350px;
                 }
             }
         </style>
@@ -1556,8 +1579,12 @@ new class extends Component
                     const initialContent = hiddenTextarea ? hiddenTextarea.value || '' : '';
 
                     try {
-                        // Get container height
-                        const containerHeight = container.offsetHeight || 600;
+                        // Get container height - use a calculated height based on viewport
+                        const containerRect = container.getBoundingClientRect();
+                        const viewportHeight = window.innerHeight;
+                        // Use 60% of viewport height, with min 400px and max 800px
+                        const calculatedHeight = Math.max(400, Math.min(800, viewportHeight * 0.6));
+                        const containerHeight = containerRect.height > 0 ? containerRect.height : calculatedHeight;
                         
                         // Try to initialize with preset, fallback to basic if preset fails
                         let plugins = ['gjs-preset-newsletter'];
@@ -1602,6 +1629,14 @@ new class extends Component
                                 ],
                             },
                         });
+                        
+                        // Force editor to be visible
+                        const editorEl = document.querySelector('#emailBodyEditor');
+                        if (editorEl) {
+                            editorEl.style.display = 'block';
+                            editorEl.style.visibility = 'visible';
+                            editorEl.style.opacity = '1';
+                        }
 
                         console.log('GrapesJS: Editor initialized successfully');
 
@@ -1777,9 +1812,18 @@ new class extends Component
                         document.addEventListener('keydown', handleEscape);
                         
                         // Initialize editor when modal opens (wait for modal to be fully rendered)
+                        // Use multiple attempts to ensure editor initializes
                         setTimeout(() => {
                             checkAndInitEditor();
-                        }, 1000);
+                        }, 300);
+                        
+                        setTimeout(() => {
+                            checkAndInitEditor();
+                        }, 800);
+                        
+                        setTimeout(() => {
+                            checkAndInitEditor();
+                        }, 1500);
                     });
 
                     // Watch for modal closing

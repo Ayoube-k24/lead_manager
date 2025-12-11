@@ -84,3 +84,4 @@ describe('ApiToken Model - Attributes', function () {
             ->and($token->expires_at)->toBeInstanceOf(\Carbon\Carbon::class);
     });
 });
+

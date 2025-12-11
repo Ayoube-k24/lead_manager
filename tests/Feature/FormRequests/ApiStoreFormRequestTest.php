@@ -18,3 +18,4 @@ describe('Api\StoreFormRequest', function () {
             ->and($request->rules())->toBeEmpty();
     });
 });
+

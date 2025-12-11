@@ -83,3 +83,4 @@ describe('LeadEmail Model', function () {
             ->and($leadEmail->emailSubject)->toBeNull();
     });
 });
+

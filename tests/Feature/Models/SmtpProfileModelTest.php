@@ -56,3 +56,4 @@ describe('SmtpProfile Model - Attributes', function () {
         expect($profile->is_active)->toBeTrue();
     });
 });
+

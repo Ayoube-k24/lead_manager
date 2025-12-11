@@ -74,6 +74,20 @@ class AgentEmailService
             return false;
         }
 
+        // Log configuration for debugging (without password)
+        Log::debug('Sending agent email', [
+            'lead_id' => $lead->id,
+            'agent_id' => $agent->id,
+            'email' => $lead->email,
+            'smtp_host' => $smtpProfile->host,
+            'smtp_port' => $smtpProfile->port,
+            'smtp_username' => $smtpProfile->username,
+            'smtp_encryption' => $smtpProfile->encryption,
+            'from_address' => $smtpProfile->from_address,
+            'from_name' => $smtpProfile->from_name,
+            'password_set' => ! empty($password),
+        ]);
+
         // Configure mailer
         $mailer = $this->configureMailer($smtpProfile, $password);
 
@@ -119,10 +133,14 @@ class AgentEmailService
                 'agent_id' => $agent->id,
                 'email' => $lead->email,
                 'subject' => $subject,
+                'smtp_host' => $smtpProfile->host,
             ]);
 
             return true;
         } catch (\Exception $e) {
+            $errorMessage = $e->getMessage();
+            $isAuthError = $this->isAuthenticationError($errorMessage);
+
             // Delete attachment if email sending failed
             if ($attachmentPath && Storage::disk('private')->exists($attachmentPath)) {
                 Storage::disk('private')->delete($attachmentPath);
@@ -132,9 +150,49 @@ class AgentEmailService
                 'lead_id' => $lead->id,
                 'agent_id' => $agent->id,
                 'email' => $lead->email,
-                'error' => $e->getMessage(),
+                'error' => $errorMessage,
                 'error_trace' => $e->getTraceAsString(),
+                'smtp_host' => $smtpProfile->host,
+                'smtp_port' => $smtpProfile->port,
+                'smtp_username' => $smtpProfile->username,
+                'is_authentication_error' => $isAuthError,
             ]);
+
+            // If it's an authentication error, try to use an alternative SMTP profile
+            if ($isAuthError) {
+                Log::warning('SMTP authentication failed, attempting fallback to alternative profile', [
+                    'lead_id' => $lead->id,
+                    'agent_id' => $agent->id,
+                    'failed_smtp_profile_id' => $smtpProfile->id,
+                    'smtp_host' => $smtpProfile->host,
+                    'smtp_username' => $smtpProfile->username,
+                ]);
+
+                // Try to send with an alternative active SMTP profile
+                $alternativeSent = $this->sendWithAlternativeProfile(
+                    $lead,
+                    $agent,
+                    $smtpProfile,
+                    $subject,
+                    $bodyHtml,
+                    $bodyText,
+                    $emailSubjectId,
+                    $attachmentPath,
+                    $attachmentName,
+                    $attachmentMime
+                );
+
+                if ($alternativeSent) {
+                    return true;
+                }
+
+                // If no alternative worked, log that the SMTP profile should be checked
+                Log::error('All SMTP profiles failed for agent email', [
+                    'lead_id' => $lead->id,
+                    'agent_id' => $agent->id,
+                    'original_smtp_profile_id' => $smtpProfile->id,
+                ]);
+            }
 
             return false;
         }
@@ -149,14 +207,135 @@ class AgentEmailService
             'transport' => 'smtp',
             'host' => $smtpProfile->host,
             'port' => $smtpProfile->port,
-            'encryption' => $smtpProfile->encryption,
+            'encryption' => $smtpProfile->encryption === 'none' ? null : $smtpProfile->encryption,
             'username' => $smtpProfile->username,
             'password' => $password,
-            'timeout' => 30,
+            'timeout' => null,
         ];
 
         Config::set('mail.mailers.agent_smtp', $config);
 
         return app('mail.manager')->mailer('agent_smtp');
+    }
+
+    /**
+     * Check if the error is an authentication error (535).
+     */
+    protected function isAuthenticationError(string $errorMessage): bool
+    {
+        $errorLower = strtolower($errorMessage);
+
+        return str_contains($errorLower, '535') ||
+            str_contains($errorLower, 'authentication failed') ||
+            str_contains($errorLower, 'authentication failure') ||
+            str_contains($errorLower, 'invalid login') ||
+            str_contains($errorLower, 'expected response code "235" but got code "535"');
+    }
+
+    /**
+     * Try to send email with an alternative active SMTP profile.
+     */
+    protected function sendWithAlternativeProfile(
+        Lead $lead,
+        User $agent,
+        SmtpProfile $failedProfile,
+        string $subject,
+        string $bodyHtml,
+        ?string $bodyText,
+        ?int $emailSubjectId,
+        ?string $attachmentPath,
+        ?string $attachmentName,
+        ?string $attachmentMime
+    ): bool {
+        // Get all active SMTP profiles except the failed one
+        $alternativeProfiles = SmtpProfile::where('is_active', true)
+            ->where('id', '!=', $failedProfile->id)
+            ->get();
+
+        if ($alternativeProfiles->isEmpty()) {
+            Log::warning('No alternative SMTP profiles available', [
+                'lead_id' => $lead->id,
+                'agent_id' => $agent->id,
+                'failed_smtp_profile_id' => $failedProfile->id,
+            ]);
+
+            return false;
+        }
+
+        // Try each alternative profile
+        foreach ($alternativeProfiles as $alternativeProfile) {
+            $password = $alternativeProfile->password;
+
+            if (empty($password)) {
+                Log::warning('Alternative SMTP profile has no password', [
+                    'lead_id' => $lead->id,
+                    'agent_id' => $agent->id,
+                    'smtp_profile_id' => $alternativeProfile->id,
+                ]);
+
+                continue;
+            }
+
+            try {
+                $mailer = $this->configureMailer($alternativeProfile, $password);
+
+                $mailer->send([], [], function ($message) use ($lead, $alternativeProfile, $subject, $bodyHtml, $bodyText, $attachmentPath, $attachmentName) {
+                    $message->to($lead->email)
+                        ->subject($subject)
+                        ->from($alternativeProfile->from_address, $alternativeProfile->from_name)
+                        ->html($bodyHtml);
+
+                    if (! empty($bodyText)) {
+                        $message->text($bodyText);
+                    }
+
+                    // Attach file if provided
+                    if ($attachmentPath) {
+                        $fullPath = Storage::disk('private')->path($attachmentPath);
+                        if (file_exists($fullPath)) {
+                            $message->attach($fullPath, [
+                                'as' => $attachmentName,
+                            ]);
+                        }
+                    }
+                });
+
+                // Save email record
+                LeadEmail::create([
+                    'lead_id' => $lead->id,
+                    'user_id' => $agent->id,
+                    'email_subject_id' => $emailSubjectId,
+                    'subject' => $subject,
+                    'body_html' => $bodyHtml,
+                    'body_text' => $bodyText,
+                    'attachment_path' => $attachmentPath,
+                    'attachment_name' => $attachmentName,
+                    'attachment_mime' => $attachmentMime,
+                    'sent_at' => now(),
+                ]);
+
+                Log::info('Agent email sent successfully with alternative SMTP profile', [
+                    'lead_id' => $lead->id,
+                    'agent_id' => $agent->id,
+                    'email' => $lead->email,
+                    'original_smtp_profile_id' => $failedProfile->id,
+                    'alternative_smtp_profile_id' => $alternativeProfile->id,
+                    'smtp_host' => $alternativeProfile->host,
+                ]);
+
+                return true;
+            } catch (\Exception $e) {
+                Log::warning('Alternative SMTP profile also failed', [
+                    'lead_id' => $lead->id,
+                    'agent_id' => $agent->id,
+                    'smtp_profile_id' => $alternativeProfile->id,
+                    'error' => $e->getMessage(),
+                ]);
+
+                continue;
+            }
+        }
+
+        return false;
     }
 }

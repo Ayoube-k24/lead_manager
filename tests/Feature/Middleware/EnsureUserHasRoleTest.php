@@ -76,3 +76,4 @@ describe('EnsureUserHasRole Middleware', function () {
         $response->assertForbidden();
     });
 });
+

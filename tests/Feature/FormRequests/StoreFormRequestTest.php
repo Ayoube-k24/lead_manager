@@ -241,3 +241,4 @@ describe('StoreFormRequest', function () {
         expect($validator->fails())->toBeFalse();
     });
 });
+

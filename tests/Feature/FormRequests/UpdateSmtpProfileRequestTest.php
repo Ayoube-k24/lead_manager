@@ -137,3 +137,4 @@ describe('UpdateSmtpProfileRequest', function () {
         expect($validator->fails())->toBeFalse();
     });
 });
+

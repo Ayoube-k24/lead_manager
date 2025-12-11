@@ -57,3 +57,4 @@ describe('EmailSubject Model', function () {
             ->and($ordered->last()->id)->toBe($subject1->id);
     });
 });
+

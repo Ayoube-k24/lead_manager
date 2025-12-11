@@ -18,3 +18,4 @@ describe('LeadAssigned Event', function () {
             ->and($event->agent->id)->toBe($agent->id);
     });
 });
+
