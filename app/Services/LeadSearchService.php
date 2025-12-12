@@ -234,7 +234,7 @@ class LeadSearchService
                 'label' => __('Source'),
                 'options' => [
                     'form' => __('Formulaire'),
-                    'leads_seo' => __('Leads SEO'),
+                    'import' => __('Import'),
                 ],
             ],
         ];

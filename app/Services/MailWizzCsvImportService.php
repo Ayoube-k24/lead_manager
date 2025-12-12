@@ -141,7 +141,7 @@ class MailWizzCsvImportService
                 // Créer le lead avec statut email_confirmed directement
                 $lead = Lead::create([
                     'email' => $email,
-                    'source' => 'leads_seo',
+                    'source' => 'import',
                     'status' => $emailConfirmedStatus ? $emailConfirmedStatus->slug : 'email_confirmed',
                     'status_id' => $emailConfirmedStatus?->id,
                     'email_confirmed_at' => now(),

@@ -167,7 +167,7 @@ describe('MailWizzService', function () {
             $stats = $this->service->importLeads($config);
 
             expect($stats['imported'])->toBe(1)
-                ->and(Lead::where('email', 'test@example.com')->where('source', 'leads_seo')->exists())->toBeTrue();
+                ->and(Lead::where('email', 'test@example.com')->where('source', 'import')->exists())->toBeTrue();
         });
 
         test('imports all fields from MailWizz subscriber', function () {
@@ -216,7 +216,7 @@ describe('MailWizzService', function () {
 
             $stats = $this->service->importLeads($config);
 
-            $lead = Lead::where('email', 'test@example.com')->where('source', 'leads_seo')->first();
+            $lead = Lead::where('email', 'test@example.com')->where('source', 'import')->first();
 
             expect($stats['imported'])->toBe(1)
                 ->and($lead)->not->toBeNull()
@@ -243,7 +243,7 @@ describe('MailWizzService', function () {
             // The default source is 'form', so we need to set it to something else
             $existingLead = Lead::factory()->create([
                 'email' => 'existing@example.com',
-                'source' => 'leads_seo', // Not 'form' so it will be counted as duplicate
+                'source' => 'import', // Not 'form' so it will be counted as duplicate
             ]);
 
             Http::fake([
@@ -274,7 +274,7 @@ describe('MailWizzService', function () {
             // Create an imported lead record to simulate already imported subscriber
             $lead = Lead::factory()->create([
                 'email' => 'test@example.com',
-                'source' => 'leads_seo',
+                'source' => 'import',
                 'score' => 50,
             ]);
 

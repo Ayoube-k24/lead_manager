@@ -306,11 +306,11 @@ new class extends Component
                         {{ __('Formulaire') }}
                     </button>
                     <button
-                        wire:click="toggleSource('leads_seo')"
+                        wire:click="toggleSource('import')"
                         type="button"
-                        class="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition-all {{ in_array('leads_seo', $sourceFilter) ? 'bg-green-600 text-white shadow-md ring-2 ring-green-500 ring-offset-2' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700' }}"
+                        class="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition-all {{ in_array('import', $sourceFilter) ? 'bg-green-600 text-white shadow-md ring-2 ring-green-500 ring-offset-2' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700' }}"
                     >
-                        {{ __('Leads SEO') }}
+                        {{ __('Import') }}
                     </button>
                 </div>
             </div>

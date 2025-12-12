@@ -335,7 +335,7 @@ marie@example.com,xyz789ghi012,Marie,Martin,+33 6 98 76 54 32,Tech Corp,Lyon,Fra
 
                         <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
                             <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{{ __('Comment savoir quels leads ont été importés depuis MailWizz ?') }}</div>
-                            <p class="text-sm text-neutral-600 dark:text-neutral-400">{{ __('Tous les leads importés depuis MailWizz ont le tag lead_seo attaché, la source leads_seo, et une entrée dans la table mailwizz_imported_leads.') }}</p>
+                            <p class="text-sm text-neutral-600 dark:text-neutral-400">{{ __('Tous les leads importés depuis MailWizz ont le tag lead_seo attaché, la source import, et une entrée dans la table mailwizz_imported_leads.') }}</p>
                         </div>
                     </div>
                 </div>

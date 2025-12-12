@@ -21,7 +21,7 @@ new class extends Component
 
     public ?string $sourceFilter = null;
 
-    public string $activeTab = 'form'; // 'form' or 'leads_seo'
+    public string $activeTab = 'form'; // 'form' or 'import'
 
     public function mount(): void
     {
@@ -69,7 +69,7 @@ new class extends Component
             ->pluck('id');
 
         // Filtrer par source selon l'onglet actif
-        $source = $this->activeTab === 'form' ? 'form' : 'leads_seo';
+        $source = $this->activeTab === 'form' ? 'form' : 'import';
 
         $query = Lead::whereIn('assigned_to', $agentIds)
             ->where('source', $source)
@@ -107,7 +107,7 @@ new class extends Component
             ->pluck('id');
 
         $formLeads = Lead::whereIn('assigned_to', $agentIds)->where('source', 'form')->get();
-        $seoLeads = Lead::whereIn('assigned_to', $agentIds)->where('source', 'leads_seo')->get();
+        $seoLeads = Lead::whereIn('assigned_to', $agentIds)->where('source', 'import')->get();
 
         return [
             'form' => [
@@ -116,7 +116,7 @@ new class extends Component
                 'rejected' => $formLeads->where('status', 'rejected')->count(),
                 'pending' => $formLeads->whereIn('status', ['pending_email', 'email_confirmed', 'pending_call', 'callback_pending'])->count(),
             ],
-            'leads_seo' => [
+            'import' => [
                 'total' => $seoLeads->count(),
                 'confirmed' => $seoLeads->where('status', 'confirmed')->count(),
                 'rejected' => $seoLeads->where('status', 'rejected')->count(),
@@ -173,13 +173,13 @@ new class extends Component
                 </span>
             </button>
             <button
-                wire:click="switchTab('leads_seo')"
+                wire:click="switchTab('import')"
                 type="button"
-                class="whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium transition-colors {{ $activeTab === 'leads_seo' ? 'border-green-500 text-green-600 dark:text-green-400' : 'border-transparent text-neutral-500 hover:border-neutral-300 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300' }}"
+                class="whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium transition-colors {{ $activeTab === 'import' ? 'border-green-500 text-green-600 dark:text-green-400' : 'border-transparent text-neutral-500 hover:border-neutral-300 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300' }}"
             >
-                {{ __('Leads SEO') }}
+                {{ __('Import') }}
                 <span class="ml-2 rounded-full bg-neutral-100 px-2 py-0.5 text-xs dark:bg-neutral-800">
-                    {{ $this->stats['leads_seo']['total'] }}
+                    {{ $this->stats['import']['total'] }}
                 </span>
             </button>
         </nav>

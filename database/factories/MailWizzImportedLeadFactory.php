@@ -28,7 +28,7 @@ class MailWizzImportedLeadFactory extends Factory
      */
     public function definition(): array
     {
-        $lead = \App\Models\Lead::factory()->create(['source' => 'leads_seo']);
+        $lead = \App\Models\Lead::factory()->create(['source' => 'import']);
 
         return [
             'mailwizz_subscriber_id' => fake()->uuid(),

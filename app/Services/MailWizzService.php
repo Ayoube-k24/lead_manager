@@ -234,7 +234,7 @@ class MailWizzService
                         // Les leads MailWizz sont déjà dans une liste, donc l'email est considéré comme confirmé
                         $lead = Lead::create([
                             'email' => $email,
-                            'source' => 'leads_seo',
+                            'source' => 'import',
                             'status' => $emailConfirmedStatus ? $emailConfirmedStatus->slug : 'email_confirmed',
                             'status_id' => $emailConfirmedStatus?->id,
                             'email_confirmed_at' => now(), // Marquer comme confirmé immédiatement
