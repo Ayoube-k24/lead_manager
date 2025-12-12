@@ -16,39 +16,124 @@ new class extends Component {
     public ?int $call_center_id = null;
     public bool $is_active = true;
 
-    public function mount(): void
+    /**
+     * Get the required custom fields that should be present in all forms.
+     */
+    protected function getRequiredCustomFields(): array
     {
-        // Initialize with one empty field
-        $this->fields = [
-            [
-                'name' => '',
+        return [];
+    }
+
+    /**
+     * Get the optional source field template.
+     */
+    protected function getSourceFieldTemplate(): array
+    {
+        return [
+            'name' => 'SOURCE',
+            'tag' => 'SOURCE',
                 'type' => 'text',
-                'label' => '',
+            'label' => 'Source de trafic',
                 'placeholder' => '',
-                'required' => false,
-                'validation_rules' => [],
-                'options' => [],
+            'required' => '0',
+            'visibility' => 'hidden',
+            'sort_order' => 1,
+            'help_text' => '',
+            'default_value' => '',
+            'description' => '',
+            'validation_rules' => [
+                'min_length' => 1,
+                'max_length' => 255,
             ],
+            'content_regex' => '',
+            'options' => [],
         ];
     }
 
-    public function addField(): void
+    /**
+     * Ensure all required custom fields are present in the form.
+     */
+    protected function ensureRequiredCustomFields(): void
     {
-        $this->fields[] = [
+        $requiredFields = $this->getRequiredCustomFields();
+        $existingFieldTags = array_column($this->fields, 'tag');
+
+        foreach ($requiredFields as $requiredField) {
+            if (! in_array($requiredField['tag'], $existingFieldTags, true)) {
+                $this->fields[] = $requiredField;
+            }
+        }
+    }
+
+    public function mount(): void
+    {
+        // Initialize with empty fields array
+        $this->fields = [];
+
+        // No longer automatically adding required fields - they are optional now
+    }
+
+    public function addField(string $type = 'text'): void
+    {
+        $fieldCount = count($this->fields);
+        $defaultField = [
             'name' => '',
-            'type' => 'text',
+            'tag' => '',
+            'type' => $type,
             'label' => '',
             'placeholder' => '',
-            'required' => false,
-            'validation_rules' => [],
+            'required' => '0',
+            'visibility' => 'visible',
+            'sort_order' => $fieldCount + 1,
+            'help_text' => '',
+            'default_value' => '',
+            'description' => '',
+            'validation_rules' => [
+                'min_length' => 1,
+                'max_length' => 255,
+            ],
+            'content_regex' => '',
             'options' => [],
         ];
+
+        // Type-specific defaults
+        match ($type) {
+            'select', 'multiselect', 'radiolist', 'checkboxlist' => $defaultField['options'] = [],
+            'number' => $defaultField['validation_rules'] = ['min' => 0, 'max' => null],
+            'email' => $defaultField['validation_rules'] = ['min_length' => 1, 'max_length' => 255],
+            'tel' => $defaultField['validation_rules'] = ['min_length' => 1, 'max_length' => 20],
+            'date', 'datetime' => $defaultField['validation_rules'] = [],
+            'consent' => $defaultField['required'] = '1',
+            default => null,
+        };
+
+        $this->fields[] = $defaultField;
     }
 
     public function removeField(int $index): void
     {
         unset($this->fields[$index]);
         $this->fields = array_values($this->fields);
+        
+        // Réorganiser les sort_order
+        foreach ($this->fields as $newIndex => $field) {
+            $this->fields[$newIndex]['sort_order'] = $newIndex + 1;
+        }
+    }
+
+    public function addSourceField(): void
+    {
+        $existingFieldTags = array_column($this->fields, 'tag');
+        
+        // Vérifier si le champ SOURCE existe déjà
+        if (! in_array('SOURCE', $existingFieldTags, true)) {
+            $fieldCount = count($this->fields);
+            $sourceField = $this->getSourceFieldTemplate();
+            $sourceField['sort_order'] = $fieldCount + 1;
+            $this->fields[] = $sourceField;
+        } else {
+            session()->flash('error', __('Le champ Source de trafic existe déjà.'));
+        }
     }
 
     public function addOption(int $fieldIndex): void
@@ -56,7 +141,10 @@ new class extends Component {
         if (! isset($this->fields[$fieldIndex]['options'])) {
             $this->fields[$fieldIndex]['options'] = [];
         }
-        $this->fields[$fieldIndex]['options'][] = '';
+        $this->fields[$fieldIndex]['options'][] = [
+            'label' => '',
+            'value' => '',
+        ];
     }
 
     public function removeOption(int $fieldIndex, int $optionIndex): void
@@ -67,6 +155,9 @@ new class extends Component {
 
     public function store(): void
     {
+        // Ensure all required custom fields are present before validation
+        $this->ensureRequiredCustomFields();
+
         $validated = $this->validate((new StoreFormRequest)->rules());
 
         Form::create($validated);
@@ -107,58 +198,264 @@ new class extends Component {
         <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">{{ __('Créez un nouveau formulaire de capture de leads avec validation dynamique') }}</p>
     </div>
 
+    <!-- Messages flash -->
+    @if (session('message'))
+        <flux:callout variant="success" icon="check-circle">
+            {{ session('message') }}
+        </flux:callout>
+    @endif
+
+    @if (session('error'))
+        <flux:callout variant="danger" icon="exclamation-circle">
+            {{ session('error') }}
+        </flux:callout>
+    @endif
+
     <flux:callout variant="neutral" icon="information-circle">
         {{ __('Un identifiant API unique de 12 caractères sera généré automatiquement après la création. Utilisez-le pour connecter vos landing pages.') }}
     </flux:callout>
 
-    <form wire:submit="store" class="space-y-6">
-        <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
-            <h2 class="mb-4 text-lg font-semibold">{{ __('Informations générales') }}</h2>
+    <form wire:submit="store" class="space-y-8">
+        <div class="rounded-lg border border-neutral-200 bg-white p-5 dark:border-neutral-700 dark:bg-neutral-800">
+            <div class="mb-4 border-b border-neutral-200 pb-3 dark:border-neutral-700">
+                <h2 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{{ __('Informations générales') }}</h2>
+            </div>
             <div class="space-y-4">
                 <flux:input wire:model="name" :label="__('Nom du formulaire')" required />
                 <flux:textarea wire:model="description" :label="__('Description')" rows="3" />
             </div>
         </div>
 
-        <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
-            <div class="mb-4 flex items-center justify-between">
-<div>
-                    <h2 class="text-lg font-semibold">{{ __('Champs du formulaire') }}</h2>
-                    <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">{{ __('Définissez les champs que les utilisateurs devront remplir') }}</p>
+        <div class="rounded-lg border border-neutral-200 bg-white p-5 dark:border-neutral-700 dark:bg-neutral-800">
+            <div class="mb-4 border-b border-neutral-200 pb-3 dark:border-neutral-700">
+                <h2 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{{ __('Champs du formulaire') }}</h2>
                 </div>
-                <flux:button type="button" wire:click="addField" variant="ghost" size="sm" icon="plus">
-                    {{ __('Ajouter un champ') }}
-                </flux:button>
+
+            <!-- Grille de boutons pour ajouter des champs -->
+            <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                <button type="button" wire:click="addField('text')" class="flex flex-col items-center justify-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-3 text-xs font-medium text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-700">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6" />
+                    </svg>
+                    <span>{{ __('Texte') }}</span>
+                </button>
+                <button type="button" wire:click="addField('select')" class="flex flex-col items-center justify-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-3 text-xs font-medium text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-700">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6" />
+                    </svg>
+                    <span>{{ __('Liste déroulante') }}</span>
+                </button>
+                <button type="button" wire:click="addField('email')" class="flex flex-col items-center justify-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-3 text-xs font-medium text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-700">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6" />
+                    </svg>
+                    <span>{{ __('Email') }}</span>
+                </button>
+                <button type="button" wire:click="addField('tel')" class="flex flex-col items-center justify-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-3 text-xs font-medium text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-700">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6" />
+                    </svg>
+                    <span>{{ __('Téléphone') }}</span>
+                </button>
+                <button type="button" wire:click="addField('textarea')" class="flex flex-col items-center justify-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-3 text-xs font-medium text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-700">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6" />
+                    </svg>
+                    <span>{{ __('Zone de texte') }}</span>
+                </button>
+                <button type="button" wire:click="addField('checkbox')" class="flex flex-col items-center justify-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-3 text-xs font-medium text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-700">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6" />
+                    </svg>
+                    <span>{{ __('Case à cocher') }}</span>
+                </button>
+                <button type="button" wire:click="addField('date')" class="flex flex-col items-center justify-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-3 text-xs font-medium text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-700">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6" />
+                    </svg>
+                    <span>{{ __('Date') }}</span>
+                </button>
+                <button type="button" wire:click="addField('datetime')" class="flex flex-col items-center justify-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-3 text-xs font-medium text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-700">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6" />
+                    </svg>
+                    <span>{{ __('Date et heure') }}</span>
+                </button>
+                <button type="button" wire:click="addField('number')" class="flex flex-col items-center justify-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-3 text-xs font-medium text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-700">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6" />
+                    </svg>
+                    <span>{{ __('Nombre') }}</span>
+                </button>
+                <button type="button" wire:click="addField('file')" class="flex flex-col items-center justify-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-3 text-xs font-medium text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-700">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6" />
+                    </svg>
+                    <span>{{ __('Fichier') }}</span>
+                </button>
+                <button type="button" wire:click="addField('url')" class="flex flex-col items-center justify-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-3 text-xs font-medium text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-700">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6" />
+                    </svg>
+                    <span>{{ __('URL') }}</span>
+                </button>
+                <button type="button" wire:click="addField('multiselect')" class="flex flex-col items-center justify-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-3 text-xs font-medium text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-700">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6" />
+                    </svg>
+                    <span>{{ __('Sélection multiple') }}</span>
+                </button>
+                <button type="button" wire:click="addField('radiolist')" class="flex flex-col items-center justify-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-3 text-xs font-medium text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-700">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6" />
+                    </svg>
+                    <span>{{ __('Liste radio') }}</span>
+                </button>
+                <button type="button" wire:click="addField('checkboxlist')" class="flex flex-col items-center justify-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-3 text-xs font-medium text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-700">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6" />
+                    </svg>
+                    <span>{{ __('Liste de cases') }}</span>
+                </button>
+                <button type="button" wire:click="addField('consent')" class="flex flex-col items-center justify-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-3 text-xs font-medium text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-700">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>{{ __('Consentement') }}</span>
+                </button>
+                <button type="button" wire:click="addSourceField()" class="flex flex-col items-center justify-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 py-3 text-xs font-medium text-blue-700 transition-colors hover:border-blue-300 hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-300 dark:hover:border-blue-600 dark:hover:bg-blue-900/30">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <span>{{ __('Source de trafic') }}</span>
+                </button>
             </div>
 
-            <div class="space-y-6">
+            <div class="mt-6 space-y-6">
+                @if (count($fields) > 0)
+                    <div class="mb-4 flex items-center justify-between">
+                        <h3 class="text-sm font-medium text-neutral-700 dark:text-neutral-300">{{ __('Champs configurés') }} ({{ count($fields) }})</h3>
+                    </div>
                 @foreach ($fields as $index => $field)
-                    <div class="rounded-lg border border-neutral-200 p-4 dark:border-neutral-700">
-                        <div class="mb-4 flex items-center justify-between">
-                            <h3 class="font-semibold">{{ __('Champ') }} #{{ $index + 1 }}</h3>
-                            @if (count($fields) > 1)
-                                <flux:button
+                    <div class="group relative rounded-lg border border-neutral-200 bg-white p-5 transition-colors hover:border-neutral-300 dark:border-neutral-700 dark:bg-neutral-800 dark:hover:border-neutral-600">
+                        <!-- Header avec type de champ -->
+                        <div class="mb-5 flex items-center justify-between border-b border-neutral-200 pb-3 dark:border-neutral-700">
+                            <div class="flex items-center gap-3">
+                                <div>
+                                    <h3 class="text-base font-semibold text-neutral-900 dark:text-neutral-100">
+                                        {{ !empty($field['label']) ? $field['label'] : ucfirst($field['type'] ?? 'text') . ' ' . __('field') }}
+                                    </h3>
+                                    <p class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{{ ucfirst($field['type'] ?? 'text') }}</p>
+                                </div>
+                            </div>
+                            @if(count($fields) > 1)
+                                <button
                                     type="button"
                                     wire:click="removeField({{ $index }})"
-                                    variant="danger"
-                                    size="sm"
+                                    wire:confirm="{{ __('Êtes-vous sûr de vouloir supprimer ce champ ?') }}"
+                                    class="flex items-center gap-1.5 rounded-md bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30"
                                 >
-                                    {{ __('Supprimer') }}
-                                </flux:button>
+                                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    <span>{{ __('Supprimer') }}</span>
+                                </button>
+                            @else
+                                <button
+                                    type="button"
+                                    disabled
+                                    class="flex items-center gap-1.5 rounded-md bg-neutral-100 px-3 py-1.5 text-xs font-medium text-neutral-400 cursor-not-allowed dark:bg-neutral-700 dark:text-neutral-600"
+                                >
+                                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    <span>{{ __('Supprimer') }}</span>
+                                </button>
                             @endif
                         </div>
 
-                        <div class="grid gap-4 md:grid-cols-2">
-                            <flux:input
-                                wire:model="fields.{{ $index }}.name"
-                                :label="__('Nom du champ (technique)')"
-                                required
-                            />
+                        <!-- Première rangée : Label, Tag -->
+                        <div class="mb-4 grid gap-4 md:grid-cols-2">
                             <flux:input
                                 wire:model="fields.{{ $index }}.label"
-                                :label="__('Libellé')"
+                                :label="__('Label')"
                                 required
                             />
+                            <flux:input
+                                wire:model="fields.{{ $index }}.tag"
+                                :label="__('Tag')"
+                                required
+                            />
+                        </div>
+
+                        <!-- Deuxième rangée : Required, Visibility, Sort order -->
+                        <div class="mb-4 grid gap-4 md:grid-cols-3">
+                            <flux:select
+                                wire:model="fields.{{ $index }}.required"
+                                :label="__('Required')"
+                                required
+                            >
+                                <option value="0">{{ __('No') }}</option>
+                                <option value="1">{{ __('Yes') }}</option>
+                            </flux:select>
+                            <flux:select
+                                wire:model="fields.{{ $index }}.visibility"
+                                :label="__('Visibility')"
+                                required
+                            >
+                                <option value="visible">{{ __('Visible') }}</option>
+                                <option value="hidden">{{ __('Hidden') }}</option>
+                            </flux:select>
+                            <flux:input
+                                wire:model="fields.{{ $index }}.sort_order"
+                                type="number"
+                                :label="__('Sort order')"
+                                required
+                            />
+                        </div>
+
+                        <!-- Troisième rangée : Help text, Default value -->
+                        <div class="mb-4 grid gap-4 md:grid-cols-2">
+                            <flux:input
+                                wire:model="fields.{{ $index }}.help_text"
+                                :label="__('Help text')"
+                                placeholder="{{ __('Help text') }}"
+                            />
+                            <flux:input
+                                wire:model="fields.{{ $index }}.default_value"
+                                :label="__('Default value')"
+                                placeholder="{{ __('Default value') }}"
+                            />
+                        </div>
+
+                        <!-- Quatrième rangée : Description, Minimum length, Maximum length, Content regex -->
+                        <div class="mb-4 grid gap-4 md:grid-cols-4">
+                            <flux:input
+                                wire:model="fields.{{ $index }}.description"
+                                :label="__('Description')"
+                                placeholder="{{ __('Description') }}"
+                            />
+                            <flux:input
+                                wire:model="fields.{{ $index }}.validation_rules.min_length"
+                                type="number"
+                                :label="__('Minimum length')"
+                                required
+                            />
+                            <flux:input
+                                wire:model="fields.{{ $index }}.validation_rules.max_length"
+                                type="number"
+                                :label="__('Maximum length')"
+                                required
+                            />
+                            <flux:input
+                                wire:model="fields.{{ $index }}.content_regex"
+                                :label="__('Content regex')"
+                                placeholder="{{ __('Content regex') }}"
+                            />
+                        </div>
+
+                        <!-- Type de champ (caché mais nécessaire pour la logique) -->
+                        <div class="hidden">
                             <flux:select
                                 wire:model="fields.{{ $index }}.type"
                                 :label="__('Type de champ')"
@@ -169,99 +466,61 @@ new class extends Component {
                                 <option value="tel">{{ __('Téléphone') }}</option>
                                 <option value="textarea">{{ __('Zone de texte') }}</option>
                                 <option value="select">{{ __('Liste déroulante') }}</option>
+                                <option value="multiselect">{{ __('Sélection multiple') }}</option>
                                 <option value="checkbox">{{ __('Case à cocher') }}</option>
+                                <option value="consent">{{ __('Consentement') }}</option>
+                                <option value="checkboxlist">{{ __('Liste de cases') }}</option>
+                                <option value="radiolist">{{ __('Liste radio') }}</option>
                                 <option value="file">{{ __('Fichier') }}</option>
                                 <option value="number">{{ __('Nombre') }}</option>
                                 <option value="date">{{ __('Date') }}</option>
+                                <option value="datetime">{{ __('Date et heure') }}</option>
+                                <option value="url">{{ __('URL') }}</option>
                             </flux:select>
-                            <flux:input
-                                wire:model="fields.{{ $index }}.placeholder"
-                                :label="__('Placeholder')"
-                            />
                         </div>
 
-                        <div class="mt-4">
-                            <flux:checkbox
-                                wire:model="fields.{{ $index }}.required"
-                                :label="__('Champ obligatoire')"
-                            />
-                        </div>
-
-                        <!-- Règles de validation personnalisées -->
-                        <div class="mt-4 rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
-                            <h4 class="mb-3 text-sm font-semibold">{{ __('Règles de validation (optionnel)') }}</h4>
-                            <div class="grid gap-3 sm:grid-cols-2">
-                                @if (in_array($field['type'], ['text', 'textarea', 'email', 'tel']))
-                                    <flux:input
-                                        wire:model="fields.{{ $index }}.validation_rules.min_length"
-                                        type="number"
-                                        :label="__('Longueur minimale')"
-                                        placeholder="Ex: 3"
-                                    />
-                                    <flux:input
-                                        wire:model="fields.{{ $index }}.validation_rules.max_length"
-                                        type="number"
-                                        :label="__('Longueur maximale')"
-                                        placeholder="Ex: 255"
-                                    />
-                                @endif
-                                @if (in_array($field['type'], ['number']))
-                                    <flux:input
-                                        wire:model="fields.{{ $index }}.validation_rules.min"
-                                        type="number"
-                                        :label="__('Valeur minimale')"
-                                        placeholder="Ex: 0"
-                                    />
-                                    <flux:input
-                                        wire:model="fields.{{ $index }}.validation_rules.max"
-                                        type="number"
-                                        :label="__('Valeur maximale')"
-                                        placeholder="Ex: 100"
-                                    />
-                                @endif
-                                @if (in_array($field['type'], ['text', 'textarea', 'email', 'tel']))
-                                    <div class="sm:col-span-2">
-                                        <flux:input
-                                            wire:model="fields.{{ $index }}.validation_rules.regex"
-                                            :label="__('Expression régulière (regex)')"
-                                            placeholder="Ex: /^[A-Za-z]+$/"
-                                        />
-                                        <flux:text class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-                                            {{ __('Format: /pattern/ ou pattern') }}
-                                        </flux:text>
-                                    </div>
-                                @endif
-                            </div>
-                        </div>
-
-                        @if ($field['type'] === 'select')
-                            <div class="mt-4">
-                                <div class="mb-2 flex items-center justify-between">
-                                    <flux:text class="font-semibold">{{ __('Options') }}</flux:text>
+                        @if (in_array($field['type'], ['select', 'multiselect', 'radiolist', 'checkboxlist']))
+                            <div class="mt-4 rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
+                                <div class="mb-3 flex items-center justify-between">
+                                    <h4 class="text-sm font-semibold text-neutral-700 dark:text-neutral-300">{{ __('Options') }}</h4>
                                     <flux:button
                                         type="button"
                                         wire:click="addOption({{ $index }})"
                                         variant="ghost"
                                         size="sm"
                                     >
-                                        {{ __('Ajouter une option') }}
+                                        {{ __('Ajouter') }}
                                     </flux:button>
                                 </div>
                                 <div class="space-y-2">
+                                    <!-- En-têtes de colonnes -->
+                                    <div class="grid grid-cols-[1fr_1fr_auto] gap-2 px-1">
+                                        <div class="text-xs font-medium text-neutral-600 dark:text-neutral-400">{{ __('Label') }}</div>
+                                        <div class="text-xs font-medium text-neutral-600 dark:text-neutral-400">{{ __('Value') }}</div>
+                                        <div></div>
+                                    </div>
                                     @foreach ($field['options'] ?? [] as $optionIndex => $option)
-                                        <div class="flex items-center gap-2">
+                                        <div class="flex items-center gap-2 rounded-md border border-neutral-200 bg-neutral-50 p-2 dark:border-neutral-600 dark:bg-neutral-800">
                                             <flux:input
-                                                wire:model="fields.{{ $index }}.options.{{ $optionIndex }}"
-                                                :placeholder="__('Valeur de l\'option')"
+                                                wire:model="fields.{{ $index }}.options.{{ $optionIndex }}.label"
+                                                :placeholder="__('Label')"
+                                                class="flex-1"
                                             />
-                                            <flux:button
+                                            <flux:input
+                                                wire:model="fields.{{ $index }}.options.{{ $optionIndex }}.value"
+                                                :placeholder="__('Value')"
+                                                class="flex-1"
+                                            />
+                                            <button
                                                 type="button"
                                                 wire:click="removeOption({{ $index }}, {{ $optionIndex }})"
-                                                variant="danger"
-                                                size="sm"
+                                                class="flex h-9 w-9 items-center justify-center rounded-md bg-red-50 text-red-600 transition-colors hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30"
+                                                title="{{ __('Supprimer') }}"
                                             >
-                                                {{ __('Supprimer') }}
-                                            </flux:button>
+                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
                                         </div>
                                     @endforeach
                                 </div>
@@ -269,20 +528,23 @@ new class extends Component {
                         @endif
                     </div>
                 @endforeach
+                @endif
             </div>
         </div>
 
-        <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
-            <h2 class="mb-4 text-lg font-semibold">{{ __('Configuration') }}</h2>
+        <div class="mt-8 rounded-lg border border-neutral-200 bg-white p-5 dark:border-neutral-700 dark:bg-neutral-800">
+            <div class="mb-4 border-b border-neutral-200 pb-3 dark:border-neutral-700">
+                <h2 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{{ __('Configuration') }}</h2>
+            </div>
             <div class="space-y-4">
-                <flux:select wire:model="smtp_profile_id" :label="__('Profil SMTP')">
-                    <option value="">{{ __('Aucun') }}</option>
+                <flux:select wire:model="smtp_profile_id" :label="__('Profil SMTP')" required>
+                    <option value="">{{ __('Sélectionner un profil SMTP') }}</option>
                     @foreach ($smtpProfiles as $profile)
                         <option value="{{ $profile->id }}">{{ $profile->name }}</option>
                     @endforeach
                 </flux:select>
-                <flux:select wire:model="email_template_id" :label="__('Template d\'email')">
-                    <option value="">{{ __('Aucun') }}</option>
+                <flux:select wire:model="email_template_id" :label="__('Template d\'email')" required>
+                    <option value="">{{ __('Sélectionner un template d\'email') }}</option>
                     @foreach ($emailTemplates as $template)
                         <option value="{{ $template->id }}">{{ $template->name }}</option>
                     @endforeach
@@ -298,7 +560,7 @@ new class extends Component {
         </div>
 
         <!-- Section d'aide pour l'utilisation de l'API -->
-        <div class="rounded-xl border border-blue-200 bg-blue-50 p-6 dark:border-blue-800 dark:bg-blue-900/20">
+        <div class="mt-10 rounded-xl border border-blue-200 bg-blue-50 p-6 dark:border-blue-800 dark:bg-blue-900/20">
             <div class="mb-4 flex items-center justify-between">
                 <div class="flex items-center gap-2">
                     <svg class="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -411,7 +673,7 @@ document.getElementById('leadForm').addEventListener('submit', async (e) => {
         </div>
 
         <!-- Actions -->
-        <div class="flex items-center justify-between border-t border-neutral-200 pt-6 dark:border-neutral-700">
+        <div class="mt-8 flex items-center justify-between border-t border-neutral-200 pt-6 dark:border-neutral-700">
             <flux:button href="{{ route('admin.forms') }}" variant="ghost" wire:navigate>
                 {{ __('Annuler') }}
             </flux:button>

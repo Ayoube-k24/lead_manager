@@ -100,7 +100,11 @@ describe('FormValidationService', function () {
                         'type' => 'select',
                         'label' => 'Country',
                         'required' => true,
-                        'options' => ['FR', 'US', 'UK'],
+                        'options' => [
+                            ['label' => 'France', 'value' => 'FR'],
+                            ['label' => 'United States', 'value' => 'US'],
+                            ['label' => 'United Kingdom', 'value' => 'UK'],
+                        ],
                     ],
                 ],
             ]);

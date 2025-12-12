@@ -79,7 +79,7 @@ new class extends Component {
                         >
                             <option value="">{{ __('Sélectionner...') }}</option>
                             @foreach ($field['options'] ?? [] as $option)
-                                <option value="{{ $option }}">{{ $option }}</option>
+                                <option value="{{ $option['value'] ?? $option }}">{{ $option['label'] ?? $option }}</option>
                             @endforeach
                         </flux:select>
                     @elseif ($field['type'] === 'checkbox')

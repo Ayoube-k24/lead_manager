@@ -113,35 +113,108 @@ new class extends Component {
   "fields": [
     {
       "name": "email",
+      "tag": "EMAIL",
       "type": "email",
       "label": "Email",
       "placeholder": "votre@email.com",
-      "required": true
+      "required": true,
+      "visibility": "visible",
+      "sort_order": 1,
+      "help_text": "Entrez votre adresse email",
+      "default_value": "",
+      "description": "Adresse email du contact",
+      "validation_rules": {
+        "min_length": 5,
+        "max_length": 255
+      },
+      "content_regex": ""
     },
     {
       "name": "name",
+      "tag": "NAME",
       "type": "text",
       "label": "Nom",
+      "placeholder": "Votre nom",
       "required": true,
+      "visibility": "visible",
+      "sort_order": 2,
+      "help_text": "",
+      "default_value": "",
+      "description": "",
       "validation_rules": {
         "min_length": 2,
         "max_length": 50
-      }
+      },
+      "content_regex": ""
     },
     {
       "name": "phone",
+      "tag": "PHONE",
       "type": "tel",
       "label": "Téléphone",
+      "placeholder": "+33 6 12 34 56 78",
       "required": false,
+      "visibility": "visible",
+      "sort_order": 3,
+      "help_text": "",
+      "default_value": "",
+      "description": "",
       "validation_rules": {
+        "min_length": 10,
+        "max_length": 20,
         "regex": "^[+]?[(]?[0-9]{1,4}[)]?[-\\s.]?[(]?[0-9]{1,4}[)]?[-\\s.]?[0-9]{1,9}$"
-      }
+      },
+      "content_regex": "^[+]?[(]?[0-9]{1,4}[)]?[-\\s.]?[(]?[0-9]{1,4}[)]?[-\\s.]?[0-9]{1,9}$"
+    },
+    {
+      "name": "country",
+      "tag": "COUNTRY",
+      "type": "select",
+      "label": "Pays",
+      "placeholder": "",
+      "required": true,
+      "visibility": "visible",
+      "sort_order": 4,
+      "help_text": "Sélectionnez votre pays",
+      "default_value": "",
+      "description": "",
+      "validation_rules": {
+        "min_length": 1,
+        "max_length": 255
+      },
+      "content_regex": "",
+      "options": [
+        {
+          "label": "France",
+          "value": "FR"
+        },
+        {
+          "label": "United States",
+          "value": "US"
+        },
+        {
+          "label": "Canada",
+          "value": "CA"
+        }
+      ]
     },
     {
       "name": "message",
+      "tag": "MESSAGE",
       "type": "textarea",
       "label": "Message",
-      "required": false
+      "placeholder": "Votre message",
+      "required": false,
+      "visibility": "visible",
+      "sort_order": 5,
+      "help_text": "",
+      "default_value": "",
+      "description": "",
+      "validation_rules": {
+        "min_length": 10,
+        "max_length": 1000
+      },
+      "content_regex": ""
     }
   ],
   "smtp_profile_id": 1,
@@ -149,7 +222,7 @@ new class extends Component {
   "is_active": true
 }</code></pre>
                         <p class="mt-2 text-xs text-neutral-600 dark:text-neutral-400">
-                            {{ __('Note : Les règles de validation (`validation_rules`) sont optionnelles. Vous pouvez créer des champs avec ou sans règles de validation personnalisées.') }}
+                            {{ __('Note : Les champs suivants sont optionnels : `tag`, `visibility`, `sort_order`, `help_text`, `default_value`, `description`, `content_regex`, et `validation_rules`. Pour les champs de type select, multiselect, radiolist, et checkboxlist, les `options` doivent être un tableau d\'objets avec `label` et `value`.') }}
                         </p>
                     </div>
                 </div>
@@ -229,10 +302,24 @@ new class extends Component {
 
 {
   "name": "country",
+  "tag": "COUNTRY",
   "type": "select",
   "label": "Pays",
   "required": true,
-  "options": ["FR", "BE", "CH"],
+  "options": [
+    {
+      "label": "France",
+      "value": "FR"
+    },
+    {
+      "label": "Belgium",
+      "value": "BE"
+    },
+    {
+      "label": "Switzerland",
+      "value": "CH"
+    }
+  ],
   "validation_rules": {
     "in": ["FR", "BE", "CH"]
   }

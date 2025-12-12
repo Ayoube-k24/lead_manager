@@ -7,6 +7,7 @@ use App\Models\Form;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class FormController extends Controller
 {
@@ -41,10 +42,17 @@ class FormController extends Controller
             'description' => ['nullable', 'string'],
             'fields' => ['required', 'array', 'min:1'],
             'fields.*.name' => ['required', 'string', 'max:255'],
-            'fields.*.type' => ['required', 'string', 'in:text,email,tel,textarea,select,checkbox,file,number,date'],
+            'fields.*.type' => ['required', 'string', Rule::in(['text', 'email', 'tel', 'textarea', 'select', 'checkbox', 'file', 'number', 'date', 'datetime', 'url', 'multiselect', 'radiolist', 'checkboxlist', 'consent'])],
             'fields.*.label' => ['required', 'string', 'max:255'],
             'fields.*.placeholder' => ['nullable', 'string', 'max:255'],
             'fields.*.required' => ['sometimes', 'boolean'],
+            'fields.*.tag' => ['nullable', 'string', 'max:255'],
+            'fields.*.visibility' => ['nullable', 'string', Rule::in(['visible', 'hidden'])],
+            'fields.*.sort_order' => ['nullable', 'integer', 'min:1'],
+            'fields.*.help_text' => ['nullable', 'string', 'max:500'],
+            'fields.*.default_value' => ['nullable'],
+            'fields.*.description' => ['nullable', 'string', 'max:1000'],
+            'fields.*.content_regex' => ['nullable', 'string', 'max:500'],
             'fields.*.validation_rules' => ['nullable', 'array'],
             'fields.*.validation_rules.min' => ['nullable', 'numeric', 'min:0'],
             'fields.*.validation_rules.max' => ['nullable', 'numeric', 'min:0'],
@@ -52,7 +60,7 @@ class FormController extends Controller
             'fields.*.validation_rules.max_length' => ['nullable', 'integer', 'min:0'],
             'fields.*.validation_rules.regex' => ['nullable', 'string'],
             'fields.*.validation_rules.in' => ['nullable'],
-            'fields.*.options' => ['nullable', 'array'],
+            'fields.*.options' => ['nullable', 'array', 'required_if:fields.*.type,select', 'required_if:fields.*.type,multiselect', 'required_if:fields.*.type,radiolist', 'required_if:fields.*.type,checkboxlist'],
             'smtp_profile_id' => ['nullable', 'exists:smtp_profiles,id'],
             'email_template_id' => ['nullable', 'exists:email_templates,id'],
             'call_center_id' => ['required', 'exists:call_centers,id'],
@@ -127,10 +135,17 @@ class FormController extends Controller
             'description' => ['nullable', 'string'],
             'fields' => ['sometimes', 'required', 'array', 'min:1'],
             'fields.*.name' => ['required', 'string', 'max:255'],
-            'fields.*.type' => ['required', 'string', 'in:text,email,tel,textarea,select,checkbox,file,number,date'],
+            'fields.*.type' => ['required', 'string', Rule::in(['text', 'email', 'tel', 'textarea', 'select', 'checkbox', 'file', 'number', 'date', 'datetime', 'url', 'multiselect', 'radiolist', 'checkboxlist', 'consent'])],
             'fields.*.label' => ['required', 'string', 'max:255'],
             'fields.*.placeholder' => ['nullable', 'string', 'max:255'],
             'fields.*.required' => ['sometimes', 'boolean'],
+            'fields.*.tag' => ['nullable', 'string', 'max:255'],
+            'fields.*.visibility' => ['nullable', 'string', Rule::in(['visible', 'hidden'])],
+            'fields.*.sort_order' => ['nullable', 'integer', 'min:1'],
+            'fields.*.help_text' => ['nullable', 'string', 'max:500'],
+            'fields.*.default_value' => ['nullable'],
+            'fields.*.description' => ['nullable', 'string', 'max:1000'],
+            'fields.*.content_regex' => ['nullable', 'string', 'max:500'],
             'fields.*.validation_rules' => ['nullable', 'array'],
             'fields.*.validation_rules.min' => ['nullable', 'numeric', 'min:0'],
             'fields.*.validation_rules.max' => ['nullable', 'numeric', 'min:0'],
@@ -138,7 +153,7 @@ class FormController extends Controller
             'fields.*.validation_rules.max_length' => ['nullable', 'integer', 'min:0'],
             'fields.*.validation_rules.regex' => ['nullable', 'string'],
             'fields.*.validation_rules.in' => ['nullable'],
-            'fields.*.options' => ['nullable', 'array'],
+            'fields.*.options' => ['nullable', 'array', 'required_if:fields.*.type,select', 'required_if:fields.*.type,multiselect', 'required_if:fields.*.type,radiolist', 'required_if:fields.*.type,checkboxlist'],
             'smtp_profile_id' => ['nullable', 'exists:smtp_profiles,id'],
             'email_template_id' => ['nullable', 'exists:email_templates,id'],
             'call_center_id' => ['sometimes', 'required', 'exists:call_centers,id'],

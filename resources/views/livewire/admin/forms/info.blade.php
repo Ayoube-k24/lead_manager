@@ -74,10 +74,10 @@ new class extends Component {
         &lt;label for="{{ $field['name'] }}"&gt;{{ $field['label'] }}@if($field['required'] ?? false) * @endif&lt;/label&gt;
         @if(($field['type'] ?? 'text') === 'textarea')
             &lt;textarea id="{{ $field['name'] }}" name="{{ $field['name'] }}" @if($field['required'] ?? false) required @endif placeholder="{{ $field['placeholder'] ?? '' }}"&gt;&lt;/textarea&gt;
-        @elseif(($field['type'] ?? 'text') === 'select')
-            &lt;select id="{{ $field['name'] }}" name="{{ $field['name'] }}" @if($field['required'] ?? false) required @endif&gt;
+        @elseif(in_array($field['type'] ?? 'text', ['select', 'multiselect', 'radiolist', 'checkboxlist']))
+            &lt;select id="{{ $field['name'] }}" name="{{ $field['name'] }}" @if($field['required'] ?? false) required @endif @if(($field['type'] ?? 'text') === 'multiselect') multiple @endif&gt;
 @foreach($field['options'] ?? [] as $option)
-                &lt;option value="{{ $option }}"&gt;{{ $option }}&lt;/option&gt;
+                &lt;option value="{{ is_array($option) ? ($option['value'] ?? '') : $option }}"&gt;{{ is_array($option) ? ($option['label'] ?? $option['value'] ?? '') : $option }}&lt;/option&gt;
 @endforeach
             &lt;/select&gt;
         @elseif(($field['type'] ?? 'text') === 'checkbox')
@@ -158,7 +158,7 @@ document.getElementById('leadForm').addEventListener('submit', async (event) => 
                 </div>
                 <pre class="overflow-x-auto rounded bg-neutral-900 p-4 text-sm text-neutral-100"><code id="curl-example">curl -X POST {{ route('forms.submit', $form) }} \
     -H "Content-Type: application/json" \
-    -d '{@json(collect($form->fields)->mapWithKeys(fn ($field) => [$field['name'] => 'EXEMPLE'])->toArray(), JSON_PRETTY_PRINT)}'</code></pre>
+    -d '{@json(collect($form->fields ?? [])->mapWithKeys(fn ($field) => [$field['name'] ?? 'field' => 'EXEMPLE'])->toArray(), JSON_PRETTY_PRINT)}'</code></pre>
             </div>
         </div>
     </div>

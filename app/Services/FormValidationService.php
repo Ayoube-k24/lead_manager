@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Form;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class FormValidationService
@@ -65,10 +66,12 @@ class FormValidationService
             'email' => $rules[] = 'email',
             'tel' => $rules[] = 'string',
             'number' => $rules[] = 'numeric',
-            'date' => $rules[] = 'date',
+            'date', 'datetime' => $rules[] = 'date',
             'file' => $rules[] = 'file',
-            'checkbox' => $rules[] = 'boolean',
-            'select' => $rules[] = 'string',
+            'checkbox', 'consent' => $rules[] = 'boolean',
+            'multiselect', 'checkboxlist' => $rules[] = 'array',
+            'select', 'radiolist' => $rules[] = 'string',
+            'url' => $rules[] = 'url',
             default => $rules[] = 'string',
         };
 
@@ -81,10 +84,18 @@ class FormValidationService
                     'max' => $rules[] = "max:{$value}",
                     'min_length' => $rules[] = "min:{$value}",
                     'max_length' => $rules[] = "max:{$value}",
-                    'regex' => $rules[] = "regex:{$value}",
+                    'regex' => $rules[] = is_string($value) ? $this->normalizeRegexRule($value) : '',
                     'in' => $rules[] = is_array($value) ? 'in:'.implode(',', $value) : "in:{$value}",
                     default => null,
                 };
+            }
+        }
+
+        // Check content_regex if validation_rules.regex is not set
+        if (! isset($customRules['regex']) && ! empty($field['content_regex'] ?? null) && is_string($field['content_regex'])) {
+            $normalizedRegex = $this->normalizeRegexRule($field['content_regex']);
+            if (! empty($normalizedRegex)) {
+                $rules[] = $normalizedRegex;
             }
         }
 
@@ -95,19 +106,67 @@ class FormValidationService
 
         if ($type === 'tel') {
             // Common phone validation
-            if (! isset($customRules['regex'])) {
+            if (! isset($customRules['regex']) && empty($field['content_regex'] ?? null)) {
                 $rules[] = 'regex:/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/';
             }
         }
 
-        if ($type === 'select') {
+        if (in_array($type, ['select', 'multiselect', 'radiolist', 'checkboxlist'])) {
             $options = $field['options'] ?? [];
             if (! empty($options)) {
-                $rules[] = 'in:'.implode(',', array_filter($options));
+                // Extraire les valeurs des options (structure label-value)
+                $optionValues = [];
+                foreach ($options as $option) {
+                    if (is_array($option) && isset($option['value'])) {
+                        $optionValues[] = $option['value'];
+                    } elseif (is_string($option)) {
+                        // Compatibilité avec l'ancienne structure
+                        $optionValues[] = $option;
+                    }
+                }
+                
+                if (! empty($optionValues)) {
+                    // Pour les types array (multiselect, checkboxlist), utiliser Rule::in() pour valider chaque élément
+                    if ($type === 'multiselect' || $type === 'checkboxlist') {
+                        $rules[] = Rule::in(array_filter($optionValues));
+                    } else {
+                        $rules[] = 'in:'.implode(',', array_filter($optionValues));
+                    }
+                }
             }
         }
 
         return $rules;
+    }
+
+    /**
+     * Normalize regex pattern for Laravel validation.
+     *
+     * @param  string  $pattern
+     * @return string
+     */
+    protected function normalizeRegexRule(string $pattern): string
+    {
+        if (empty($pattern)) {
+            return '';
+        }
+
+        // Remove leading/trailing whitespace
+        $pattern = trim($pattern);
+
+        // Check if pattern already has delimiters (e.g., /pattern/, #pattern#, ~pattern~)
+        $hasDelimiters = preg_match('/^([\/#~@%`])(.*)\1[imsxADSUXJu]*$/', $pattern);
+
+        if ($hasDelimiters) {
+            // Pattern already has delimiters, use as is
+            return "regex:{$pattern}";
+        }
+
+        // Add delimiters if missing
+        // Escape forward slashes in the pattern to avoid conflicts
+        $escapedPattern = str_replace('/', '\/', $pattern);
+
+        return "regex:/{$escapedPattern}/";
     }
 
     /**
@@ -130,6 +189,8 @@ class FormValidationService
         $messages["{$fieldName}.boolean"] = "Le champ {$fieldLabel} doit être coché ou non.";
         $messages["{$fieldName}.regex"] = "Le format du champ {$fieldLabel} est invalide.";
         $messages["{$fieldName}.in"] = "La valeur du champ {$fieldLabel} n'est pas valide.";
+        $messages["{$fieldName}.url"] = "Le champ {$fieldLabel} doit être une URL valide.";
+        $messages["{$fieldName}.array"] = "Le champ {$fieldLabel} doit être un tableau.";
 
         return $messages;
     }

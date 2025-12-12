@@ -224,9 +224,14 @@ describe('StoreFormRequest', function () {
                 ],
                 [
                     'name' => 'country',
+                    'tag' => 'COUNTRY',
                     'type' => 'select',
                     'label' => 'Country',
-                    'options' => ['US', 'CA', 'FR'],
+                    'options' => [
+                        ['label' => 'United States', 'value' => 'US'],
+                        ['label' => 'Canada', 'value' => 'CA'],
+                        ['label' => 'France', 'value' => 'FR'],
+                    ],
                 ],
             ],
             'smtp_profile_id' => $smtpProfile->id,
