@@ -1193,7 +1193,14 @@ new class extends Component
 
             @if (session('email-error'))
                 <flux:callout variant="danger" icon="exclamation-circle">
-                    {{ session('email-error') }}
+                    <div>
+                        <p class="font-semibold">{{ session('email-error') }}</p>
+                        @if (session('email-error-type') === 'smtp_decryption_error')
+                            <p class="mt-2 text-sm">
+                                {{ __('Cette erreur se produit généralement lorsque la clé de chiffrement de l\'application a changé. L\'administrateur doit mettre à jour le mot de passe du profil SMTP dans les paramètres.') }}
+                            </p>
+                        @endif
+                    </div>
                 </flux:callout>
             @endif
 

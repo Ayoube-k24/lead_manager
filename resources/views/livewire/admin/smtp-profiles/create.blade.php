@@ -3,20 +3,33 @@
 use App\Http\Requests\StoreSmtpProfileRequest;
 use App\Models\SmtpProfile;
 use App\Services\SmtpTestService;
+use Illuminate\Support\Facades\DB;
 use Livewire\Volt\Component;
 
-new class extends Component {
+new class extends Component
+{
     public string $name = '';
+
     public string $host = '';
+
     public int $port = 587;
+
     public string $encryption = 'tls';
+
     public string $username = '';
+
     public string $password = '';
+
     public string $from_address = '';
+
     public ?string $from_name = null;
+
     public bool $is_active = true;
+
     public ?string $testResult = null;
+
     public bool $testSuccess = false;
+
     public bool $isTesting = false;
 
     public function testConnection(): void
@@ -33,7 +46,7 @@ new class extends Component {
             'password' => ['required', 'string'],
         ]);
 
-        $service = new SmtpTestService();
+        $service = new SmtpTestService;
         $result = $service->testConnection([
             'host' => $this->host,
             'port' => $this->port,
@@ -49,9 +62,88 @@ new class extends Component {
 
     public function store(): void
     {
-        $validated = $this->validate((new StoreSmtpProfileRequest)->rules());
+        // Validate using the FormRequest rules
+        $rules = (new StoreSmtpProfileRequest)->rules();
+        $validated = $this->validate($rules);
 
-        SmtpProfile::create($validated);
+        // Always use password from property (Livewire may not include it in validated data)
+        if (! empty($this->password)) {
+            $validated['password'] = $this->password;
+        }
+
+        // Ensure password is included and not empty
+        if (empty($validated['password'])) {
+            $this->addError('password', __('Le mot de passe est requis.'));
+
+            return;
+        }
+
+        // Log for debugging (without password value)
+        \Illuminate\Support\Facades\Log::debug('Creating SMTP profile', [
+            'name' => $validated['name'] ?? null,
+            'host' => $validated['host'] ?? null,
+            'password_provided' => ! empty($validated['password']),
+            'password_length' => strlen($validated['password']),
+        ]);
+
+        // Create the SMTP profile (password will be encrypted by the mutator)
+        // Use new() + fill() + save() instead of create() to have more control
+        $smtpProfile = new SmtpProfile;
+        $smtpProfile->fill($validated);
+        $smtpProfile->save();
+
+        // Verify password was stored by checking the raw database value
+        // Refresh the model first to ensure it's in sync with DB
+        $smtpProfile->refresh();
+
+        // Get raw password directly from database to avoid accessor interference
+        $rawPassword = DB::table('smtp_profiles')
+            ->where('id', $smtpProfile->id)
+            ->value('password');
+
+        // Also check model attributes for debugging
+        $passwordFromAttributes = $smtpProfile->getAttributes()['password'] ?? null;
+
+        \Illuminate\Support\Facades\Log::debug('Password verification after create', [
+            'smtp_profile_id' => $smtpProfile->id,
+            'password_from_attributes' => $passwordFromAttributes ? substr($passwordFromAttributes, 0, 20).'...' : 'null',
+            'password_from_db' => $rawPassword ? substr($rawPassword, 0, 20).'...' : 'null',
+            'attributes_length' => $passwordFromAttributes ? strlen($passwordFromAttributes) : 0,
+            'db_length' => $rawPassword ? strlen($rawPassword) : 0,
+        ]);
+
+        if (empty($rawPassword)) {
+            \Illuminate\Support\Facades\Log::error('SMTP profile created but password was not stored', [
+                'smtp_profile_id' => $smtpProfile->id,
+                'validated_has_password' => ! empty($validated['password']),
+            ]);
+            session()->flash('error', __('Erreur lors du stockage du mot de passe. Veuillez réessayer.'));
+
+            return;
+        }
+
+        // Verify password can be decrypted (to ensure it was encrypted correctly)
+        try {
+            $decrypted = \Illuminate\Support\Facades\Crypt::decryptString($rawPassword);
+            \Illuminate\Support\Facades\Log::debug('SMTP profile password created and encrypted successfully', [
+                'smtp_profile_id' => $smtpProfile->id,
+                'decrypted_length' => strlen($decrypted),
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('SMTP profile password created but cannot be decrypted', [
+                'smtp_profile_id' => $smtpProfile->id,
+                'error' => $e->getMessage(),
+                'raw_password_length' => strlen($rawPassword),
+                'raw_password_preview' => substr($rawPassword, 0, 20).'...',
+                'password_from_attributes' => $passwordFromAttributes ? substr($passwordFromAttributes, 0, 20).'...' : 'null',
+            ]);
+            session()->flash('error', __('Le mot de passe a été créé mais ne peut pas être vérifié. Veuillez réessayer.'));
+
+            return;
+        }
+
+        // Clear password from component for security
+        $this->password = '';
 
         session()->flash('message', __('Profil SMTP créé avec succès !'));
 
@@ -102,7 +194,7 @@ new class extends Component {
             <h2 class="mb-4 text-lg font-semibold">{{ __('Identifiants de connexion') }}</h2>
             <div class="space-y-4">
                 <flux:input wire:model.blur="username" :label="__('Nom d\'utilisateur')" required />
-                <flux:input wire:model.blur="password" type="password" :label="__('Mot de passe')" required />
+                <flux:input wire:model="password" type="password" :label="__('Mot de passe')" required autocomplete="new-password" />
                 <flux:text class="text-xs text-neutral-500 dark:text-neutral-400">
                     {{ __('Le mot de passe sera chiffré de manière sécurisée') }}
                 </flux:text>

@@ -63,12 +63,31 @@ class AgentEmailService
             }
         }
 
-        // Get SMTP password
+        // Check if password exists but cannot be decrypted BEFORE trying to access it
+        // This prevents the accessor from logging errors unnecessarily
+        if ($smtpProfile->hasEncryptedPasswordButCannotDecrypt()) {
+            Log::error('SMTP password cannot be decrypted - APP_KEY may have changed', [
+                'lead_id' => $lead->id,
+                'smtp_profile_id' => $smtpProfile->id,
+                'smtp_profile_name' => $smtpProfile->name,
+                'action_required' => 'Please update the SMTP profile password in the admin panel',
+            ]);
+
+            // Store a specific error message in session for the user
+            session()->flash('email-error', __('Erreur de configuration SMTP : le mot de passe ne peut pas être déchiffré. Veuillez contacter l\'administrateur pour mettre à jour le profil SMTP.'));
+            session()->flash('email-error-type', 'smtp_decryption_error');
+
+            return false;
+        }
+
+        // Get SMTP password (only after verifying it can be decrypted)
         $password = $smtpProfile->password;
+
         if (empty($password)) {
             Log::error('SMTP profile has no password', [
                 'lead_id' => $lead->id,
                 'smtp_profile_id' => $smtpProfile->id,
+                'smtp_profile_name' => $smtpProfile->name,
             ]);
 
             return false;
@@ -265,6 +284,18 @@ class AgentEmailService
         // Try each alternative profile
         foreach ($alternativeProfiles as $alternativeProfile) {
             $password = $alternativeProfile->password;
+
+            // Check if password exists but cannot be decrypted
+            if ($alternativeProfile->hasEncryptedPasswordButCannotDecrypt()) {
+                Log::warning('Alternative SMTP profile password cannot be decrypted', [
+                    'lead_id' => $lead->id,
+                    'agent_id' => $agent->id,
+                    'smtp_profile_id' => $alternativeProfile->id,
+                    'smtp_profile_name' => $alternativeProfile->name,
+                ]);
+
+                continue;
+            }
 
             if (empty($password)) {
                 Log::warning('Alternative SMTP profile has no password', [

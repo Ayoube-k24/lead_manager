@@ -3,22 +3,38 @@
 use App\Http\Requests\UpdateSmtpProfileRequest;
 use App\Models\SmtpProfile;
 use App\Services\SmtpTestService;
+use Illuminate\Support\Facades\DB;
 use Livewire\Volt\Component;
 
-new class extends Component {
+new class extends Component
+{
     public SmtpProfile $smtpProfile;
+
     public string $name = '';
+
     public string $host = '';
+
     public int $port = 587;
+
     public string $encryption = 'tls';
+
     public string $username = '';
+
     public string $password = '';
+
     public string $from_address = '';
+
     public ?string $from_name = null;
+
     public bool $is_active = true;
+
     public ?string $testResult = null;
+
     public bool $testSuccess = false;
+
     public bool $isTesting = false;
+
+    public bool $passwordCannotBeDecrypted = false;
 
     public function mount(SmtpProfile $smtpProfile): void
     {
@@ -29,6 +45,10 @@ new class extends Component {
         $this->encryption = $smtpProfile->encryption;
         $this->username = $smtpProfile->username;
         $this->password = ''; // Don't pre-fill password
+
+        // Check if password exists but cannot be decrypted
+        $this->passwordCannotBeDecrypted = $smtpProfile->hasEncryptedPasswordButCannotDecrypt();
+
         $this->from_address = $smtpProfile->from_address;
         $this->from_name = $smtpProfile->from_name;
         $this->is_active = $smtpProfile->is_active;
@@ -58,7 +78,7 @@ new class extends Component {
             return;
         }
 
-        $service = new SmtpTestService();
+        $service = new SmtpTestService;
         $result = $service->testConnection([
             'host' => $this->host,
             'port' => $this->port,
@@ -75,20 +95,109 @@ new class extends Component {
     public function update(): void
     {
         $rules = (new UpdateSmtpProfileRequest)->rules();
-        
-        // Only require password if it's being changed
-        if (empty($this->password)) {
+
+        // If password cannot be decrypted, require it to be updated
+        if ($this->passwordCannotBeDecrypted && empty($this->password)) {
+            $this->addError('password', __('Le mot de passe ne peut pas être déchiffré. Veuillez saisir un nouveau mot de passe.'));
+
+            return;
+        }
+
+        // Only require password if it's being changed or cannot be decrypted
+        if (empty($this->password) && ! $this->passwordCannotBeDecrypted) {
             unset($rules['password']);
         }
 
         $validated = $this->validate($rules);
 
-        // Don't update password if it's empty
-        if (empty($validated['password'] ?? '')) {
+        // Always use password from property if provided (Livewire may not include it in validated data)
+        // The password from the form should always be plain text
+        if (! empty($this->password)) {
+            // Check if password appears to be encrypted (this shouldn't happen from form input)
+            // If it does, log a warning but still try to use it (the mutator will handle it)
+            if (str_starts_with($this->password, 'eyJ') && strlen($this->password) > 100) {
+                \Illuminate\Support\Facades\Log::warning('Password from form appears to be encrypted - this should not happen', [
+                    'smtp_profile_id' => $this->smtpProfile->id,
+                    'password_length' => strlen($this->password),
+                ]);
+                // Still use it - the mutator will detect if it's encrypted and handle it
+            }
+            // Always use the password from property (mutator will handle encryption)
+            $validated['password'] = $this->password;
+        }
+
+        // Don't update password if it's empty (unless it cannot be decrypted)
+        if (empty($validated['password'] ?? '') && ! $this->passwordCannotBeDecrypted) {
             unset($validated['password']);
         }
 
-        $this->smtpProfile->update($validated);
+        // Log for debugging
+        \Illuminate\Support\Facades\Log::debug('Updating SMTP profile', [
+            'smtp_profile_id' => $this->smtpProfile->id,
+            'password_provided' => ! empty($validated['password'] ?? ''),
+            'password_cannot_be_decrypted' => $this->passwordCannotBeDecrypted,
+            'password_from_property_length' => strlen($this->password ?? ''),
+            'password_from_property_preview' => ! empty($this->password) ? (str_starts_with($this->password, 'eyJ') ? 'ENCRYPTED' : 'PLAIN_TEXT') : 'EMPTY',
+            'validated_password_length' => isset($validated['password']) ? strlen($validated['password']) : 0,
+        ]);
+
+        // Use fill() + save() instead of update() to ensure mutator is called
+        $this->smtpProfile->fill($validated);
+        $this->smtpProfile->save();
+
+        // Verify password was updated if provided
+        if (! empty($validated['password'] ?? '')) {
+            // First, check the model's attributes (before DB query)
+            $passwordFromAttributes = $this->smtpProfile->getAttributes()['password'] ?? null;
+
+            // Get raw password directly from database to avoid accessor interference
+            // Refresh the model first to ensure it's in sync with DB
+            $this->smtpProfile->refresh();
+            $rawPassword = DB::table('smtp_profiles')
+                ->where('id', $this->smtpProfile->id)
+                ->value('password');
+
+            // Log both values for debugging
+            \Illuminate\Support\Facades\Log::debug('Password verification after update', [
+                'smtp_profile_id' => $this->smtpProfile->id,
+                'password_from_attributes' => $passwordFromAttributes ? substr($passwordFromAttributes, 0, 20).'...' : 'null',
+                'password_from_db' => $rawPassword ? substr($rawPassword, 0, 20).'...' : 'null',
+                'attributes_length' => $passwordFromAttributes ? strlen($passwordFromAttributes) : 0,
+                'db_length' => $rawPassword ? strlen($rawPassword) : 0,
+            ]);
+
+            if (empty($rawPassword)) {
+                \Illuminate\Support\Facades\Log::error('SMTP profile updated but password was not stored', [
+                    'smtp_profile_id' => $this->smtpProfile->id,
+                ]);
+                session()->flash('error', __('Erreur lors du stockage du mot de passe. Veuillez réessayer.'));
+
+                return;
+            }
+
+            // Verify password can be decrypted (to ensure it was encrypted correctly)
+            try {
+                $decrypted = \Illuminate\Support\Facades\Crypt::decryptString($rawPassword);
+                \Illuminate\Support\Facades\Log::debug('SMTP profile password updated and encrypted successfully', [
+                    'smtp_profile_id' => $this->smtpProfile->id,
+                    'decrypted_length' => strlen($decrypted),
+                ]);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('SMTP profile password updated but cannot be decrypted', [
+                    'smtp_profile_id' => $this->smtpProfile->id,
+                    'error' => $e->getMessage(),
+                    'raw_password_length' => strlen($rawPassword),
+                    'raw_password_preview' => substr($rawPassword, 0, 20).'...',
+                    'password_from_attributes' => $passwordFromAttributes ? substr($passwordFromAttributes, 0, 20).'...' : 'null',
+                ]);
+                session()->flash('error', __('Le mot de passe a été mis à jour mais ne peut pas être vérifié. Veuillez réessayer.'));
+
+                return;
+            }
+
+            // Clear password from component for security
+            $this->password = '';
+        }
 
         session()->flash('message', __('Profil SMTP modifié avec succès !'));
 
@@ -117,6 +226,17 @@ new class extends Component {
         <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">{{ __('Modifiez les paramètres du profil SMTP') }}</p>
     </div>
 
+    <!-- Alert if password cannot be decrypted -->
+    @if ($passwordCannotBeDecrypted)
+        <flux:callout variant="danger" icon="exclamation-triangle">
+            <div>
+                <strong>{{ __('Attention :') }}</strong>
+                <p class="mt-1">{{ __('Le mot de passe actuel ne peut pas être déchiffré. Cela peut arriver si la clé de chiffrement (APP_KEY) a changé.') }}</p>
+                <p class="mt-2 font-semibold">{{ __('Vous devez saisir un nouveau mot de passe pour que ce profil SMTP fonctionne correctement.') }}</p>
+            </div>
+        </flux:callout>
+    @endif
+
     <!-- Formulaire -->
     <form wire:submit="update" class="space-y-6">
         <!-- Informations générales -->
@@ -139,9 +259,20 @@ new class extends Component {
             <h2 class="mb-4 text-lg font-semibold">{{ __('Identifiants de connexion') }}</h2>
             <div class="space-y-4">
                 <flux:input wire:model.blur="username" :label="__('Nom d\'utilisateur')" required />
-                <flux:input wire:model.blur="password" type="password" :label="__('Mot de passe')" :placeholder="__('Laisser vide pour ne pas modifier')" />
+                <flux:input 
+                    wire:model="password" 
+                    type="password" 
+                    :label="__('Mot de passe')" 
+                    :placeholder="$passwordCannotBeDecrypted ? __('Nouveau mot de passe requis') : __('Laisser vide pour ne pas modifier')"
+                    :required="$passwordCannotBeDecrypted"
+                    autocomplete="new-password"
+                />
                 <flux:text class="text-xs text-neutral-500 dark:text-neutral-400">
-                    {{ __('Laissez le champ vide si vous ne souhaitez pas modifier le mot de passe') }}
+                    @if ($passwordCannotBeDecrypted)
+                        <span class="font-semibold text-red-600 dark:text-red-400">{{ __('Le mot de passe est requis car l\'ancien ne peut pas être déchiffré.') }}</span>
+                    @else
+                        {{ __('Laissez le champ vide si vous ne souhaitez pas modifier le mot de passe') }}
+                    @endif
                 </flux:text>
             </div>
         </div>
