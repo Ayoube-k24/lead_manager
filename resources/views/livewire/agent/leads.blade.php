@@ -275,36 +275,6 @@ new class extends Component
             </div>
         </div>
 
-        <!-- Filtre par source -->
-        <div>
-            <label class="mb-2 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                {{ __('Source') }}
-            </label>
-            <div class="flex flex-wrap gap-2">
-                <button
-                    wire:click="$set('sourceFilter', null)"
-                    type="button"
-                    class="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition-all {{ $sourceFilter === null ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-500 ring-offset-2' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700' }}"
-                >
-                    {{ __('Tous') }}
-                </button>
-                <button
-                    wire:click="$set('sourceFilter', 'form')"
-                    type="button"
-                    class="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition-all {{ $sourceFilter === 'form' ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-500 ring-offset-2' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700' }}"
-                >
-                    {{ __('Formulaire') }}
-                </button>
-                <button
-                    wire:click="$set('sourceFilter', 'leads_seo')"
-                    type="button"
-                    class="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition-all {{ $sourceFilter === 'leads_seo' ? 'bg-green-600 text-white shadow-md ring-2 ring-green-500 ring-offset-2' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700' }}"
-                >
-                    {{ __('Leads SEO') }}
-                </button>
-            </div>
-        </div>
-
         <!-- Filtres par tags -->
         @if ($this->tags->count() > 0)
             <div>
