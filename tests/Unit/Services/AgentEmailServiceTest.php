@@ -52,7 +52,7 @@ describe('AgentEmailService', function () {
             expect($result)->toBeTrue();
 
             // Verify email was sent
-            Mail::assertSent(function ($mail) use ($lead, $smtpProfile) {
+            Mail::assertSent(function (\Illuminate\Mail\SentMessage $mail) use ($lead, $smtpProfile) {
                 return $mail->hasTo($lead->email)
                     && $mail->hasFrom($smtpProfile->from_address, $smtpProfile->from_name);
             });
@@ -243,16 +243,21 @@ describe('AgentEmailService', function () {
             $this->service->sendEmail($lead2, $agent, 'Subject', '<p>Body</p>');
 
             // Verify each email uses its form's SMTP
-            Mail::assertSent(function ($mail) use ($lead1, $smtpProfile1) {
+            Mail::assertSent(function (\Illuminate\Mail\SentMessage $mail) use ($lead1, $smtpProfile1) {
                 return $mail->hasTo($lead1->email)
                     && $mail->hasFrom($smtpProfile1->from_address);
             });
 
-            Mail::assertSent(function ($mail) use ($lead2, $smtpProfile2) {
+            Mail::assertSent(function (\Illuminate\Mail\SentMessage $mail) use ($lead2, $smtpProfile2) {
                 return $mail->hasTo($lead2->email)
                     && $mail->hasFrom($smtpProfile2->from_address);
             });
         });
     });
 });
+
+
+
+
+
 

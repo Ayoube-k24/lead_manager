@@ -6,9 +6,9 @@ use App\Models\Lead;
 use App\Models\LeadEmail;
 use App\Models\SmtpProfile;
 use App\Models\User;
-use Illuminate\Mail\Mailer;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 
 class AgentEmailService
@@ -27,14 +27,14 @@ class AgentEmailService
     ): bool {
         // Get SMTP profile from lead's form
         $form = $lead->form;
-        if (! $form) {
+        if (!$form) {
             Log::error('Lead has no form associated', ['lead_id' => $lead->id]);
 
             return false;
         }
 
         $smtpProfile = $form->smtpProfile;
-        if (! $smtpProfile || ! $smtpProfile->is_active) {
+        if (!$smtpProfile || !$smtpProfile->is_active) {
             Log::error('No active SMTP profile found for lead', [
                 'lead_id' => $lead->id,
                 'form_id' => $form->id,
@@ -104,21 +104,21 @@ class AgentEmailService
             'smtp_encryption' => $smtpProfile->encryption,
             'from_address' => $smtpProfile->from_address,
             'from_name' => $smtpProfile->from_name,
-            'password_set' => ! empty($password),
+            'password_set' => !empty($password),
         ]);
 
         // Configure mailer
-        $mailer = $this->configureMailer($smtpProfile, $password);
+        $this->configureMailer($smtpProfile, $password);
 
         try {
             // Send email
-            $mailer->send([], [], function ($message) use ($lead, $smtpProfile, $subject, $bodyHtml, $bodyText, $attachmentPath, $attachmentName) {
+            Mail::send([], [], function ($message) use ($lead, $smtpProfile, $subject, $bodyHtml, $bodyText, $attachmentPath, $attachmentName) {
                 $message->to($lead->email)
                     ->subject($subject)
                     ->from($smtpProfile->from_address, $smtpProfile->from_name)
                     ->html($bodyHtml);
 
-                if (! empty($bodyText)) {
+                if (!empty($bodyText)) {
                     $message->text($bodyText);
                 }
 
@@ -220,9 +220,16 @@ class AgentEmailService
     /**
      * Configure mailer with SMTP profile.
      */
-    protected function configureMailer(SmtpProfile $smtpProfile, string $password): Mailer
+    protected function configureMailer(SmtpProfile $smtpProfile, string $password): void
     {
-        $config = [
+        // If Mail is faked (for testing), don't change config
+        if (Mail::getFacadeRoot() instanceof \Illuminate\Support\Testing\Fakes\MailFake) {
+            return;
+        }
+
+        // Configure the default SMTP mailer
+        Config::set('mail.default', 'smtp');
+        Config::set('mail.mailers.smtp', [
             'transport' => 'smtp',
             'host' => $smtpProfile->host,
             'port' => $smtpProfile->port,
@@ -230,11 +237,7 @@ class AgentEmailService
             'username' => $smtpProfile->username,
             'password' => $password,
             'timeout' => null,
-        ];
-
-        Config::set('mail.mailers.agent_smtp', $config);
-
-        return app('mail.manager')->mailer('agent_smtp');
+        ]);
     }
 
     /**
@@ -308,15 +311,15 @@ class AgentEmailService
             }
 
             try {
-                $mailer = $this->configureMailer($alternativeProfile, $password);
+                $this->configureMailer($alternativeProfile, $password);
 
-                $mailer->send([], [], function ($message) use ($lead, $alternativeProfile, $subject, $bodyHtml, $bodyText, $attachmentPath, $attachmentName) {
+                Mail::send([], [], function ($message) use ($lead, $alternativeProfile, $subject, $bodyHtml, $bodyText, $attachmentPath, $attachmentName) {
                     $message->to($lead->email)
                         ->subject($subject)
                         ->from($alternativeProfile->from_address, $alternativeProfile->from_name)
                         ->html($bodyHtml);
 
-                    if (! empty($bodyText)) {
+                    if (!empty($bodyText)) {
                         $message->text($bodyText);
                     }
 

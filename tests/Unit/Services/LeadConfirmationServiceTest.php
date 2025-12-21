@@ -48,7 +48,7 @@ describe('LeadConfirmationService', function () {
                 ->and($lead->fresh()->email_confirmation_token_expires_at)->not->toBeNull();
 
             // Verify email was sent
-            Mail::assertSent(function ($mail) use ($lead, $smtpProfile) {
+            Mail::assertSent(function (\Illuminate\Mail\SentMessage $mail) use ($lead, $smtpProfile) {
                 return $mail->hasTo($lead->email)
                     && $mail->hasFrom($smtpProfile->from_address);
             });
@@ -92,7 +92,7 @@ describe('LeadConfirmationService', function () {
             $expiresAt = $lead->fresh()->email_confirmation_token_expires_at;
             // Calculate hours until expiration (expiresAt is in the future)
             $hoursUntilExpiration = now()->diffInHours($expiresAt, false);
-            
+
             expect($expiresAt)->not->toBeNull()
                 ->and($expiresAt->isFuture())->toBeTrue()
                 ->and($hoursUntilExpiration)->toBeGreaterThanOrEqual(23) // Should be close to 24 hours
@@ -192,7 +192,7 @@ describe('LeadConfirmationService', function () {
             expect($result)->toBeTrue();
 
             // Verify email was sent with correct subject (rendered)
-            Mail::assertSent(function ($mail) use ($lead) {
+            Mail::assertSent(function (\Illuminate\Mail\SentMessage $mail) use ($lead) {
                 return $mail->hasTo($lead->email)
                     && str_contains($mail->subject, 'John Doe');
             });
@@ -217,7 +217,7 @@ describe('LeadConfirmationService', function () {
             expect($lead->fresh()->email_confirmation_token)->toBe($existingToken);
 
             // Verify email was sent
-            Mail::assertSent(function ($mail) use ($lead) {
+            Mail::assertSent(function (\Illuminate\Mail\SentMessage $mail) use ($lead) {
                 return $mail->hasTo($lead->email);
             });
         });
@@ -250,7 +250,7 @@ describe('LeadConfirmationService', function () {
             expect($result)->toBeTrue();
 
             // Verify email was sent to the correct recipient
-            Mail::assertSent(function ($mail) use ($lead, $smtpProfile) {
+            Mail::assertSent(function (\Illuminate\Mail\SentMessage $mail) use ($lead, $smtpProfile) {
                 return $mail->hasTo($lead->email)
                     && $mail->hasFrom($smtpProfile->from_address, $smtpProfile->from_name);
             });
@@ -304,13 +304,13 @@ describe('LeadConfirmationService', function () {
             $this->service->sendConfirmationEmail($lead2);
 
             // Verify lead1 email uses form1's SMTP
-            Mail::assertSent(function ($mail) use ($lead1, $smtpProfile1) {
+            Mail::assertSent(function (\Illuminate\Mail\SentMessage $mail) use ($lead1, $smtpProfile1) {
                 return $mail->hasTo($lead1->email)
                     && $mail->hasFrom($smtpProfile1->from_address, $smtpProfile1->from_name);
             });
 
             // Verify lead2 email uses form2's SMTP
-            Mail::assertSent(function ($mail) use ($lead2, $smtpProfile2) {
+            Mail::assertSent(function (\Illuminate\Mail\SentMessage $mail) use ($lead2, $smtpProfile2) {
                 return $mail->hasTo($lead2->email)
                     && $mail->hasFrom($smtpProfile2->from_address, $smtpProfile2->from_name);
             });
@@ -347,7 +347,7 @@ describe('LeadConfirmationService', function () {
             expect($result)->toBeTrue();
 
             // Verify email uses the SMTP profile's from address and name
-            Mail::assertSent(function ($mail) use ($smtpProfile) {
+            Mail::assertSent(function (\Illuminate\Mail\SentMessage $mail) use ($smtpProfile) {
                 return $mail->hasFrom($smtpProfile->from_address, $smtpProfile->from_name);
             });
 
@@ -390,7 +390,7 @@ describe('LeadConfirmationService', function () {
 
                 // Verify each email uses its form's SMTP profile
                 $smtpProfile = $smtpProfiles[$index];
-                Mail::assertSent(function ($mail) use ($lead, $smtpProfile) {
+                Mail::assertSent(function (\Illuminate\Mail\SentMessage $mail) use ($lead, $smtpProfile) {
                     return $mail->hasTo($lead->email)
                         && $mail->hasFrom($smtpProfile->from_address);
                 });

@@ -21,28 +21,28 @@ class LeadConfirmationService
     {
         $form = $lead->form;
 
-        if (! $form) {
+        if (!$form) {
             return false;
         }
 
         $smtpProfile = $form->smtpProfile;
         $emailTemplate = $form->emailTemplate;
 
-        if (! $smtpProfile || ! $emailTemplate) {
+        if (!$smtpProfile || !$emailTemplate) {
             return false;
         }
 
-        if (! $smtpProfile->is_active) {
+        if (!$smtpProfile->is_active) {
             return false;
         }
 
         // Generate confirmation token if not exists
-        if (! $lead->email_confirmation_token) {
+        if (!$lead->email_confirmation_token) {
             $lead->email_confirmation_token = Str::random(64);
         }
 
         // Always set expiration if not set or expired
-        if (! $lead->email_confirmation_token_expires_at || $lead->email_confirmation_token_expires_at->isPast()) {
+        if (!$lead->email_confirmation_token_expires_at || $lead->email_confirmation_token_expires_at->isPast()) {
             $lead->email_confirmation_token_expires_at = now()->addHours(24);
         }
 
@@ -77,7 +77,7 @@ class LeadConfirmationService
             'smtp_encryption' => $smtpProfile->encryption,
             'from_address' => $smtpProfile->from_address,
             'from_name' => $smtpProfile->from_name,
-            'password_set' => ! empty($password),
+            'password_set' => !empty($password),
             'password_length' => $password ? strlen($password) : 0,
         ]);
 
@@ -92,7 +92,7 @@ class LeadConfirmationService
                 'lead_id' => $lead->id,
                 'smtp_profile_id' => $smtpProfile->id,
                 'smtp_profile_name' => $smtpProfile->name,
-                'raw_password_exists' => ! empty($rawPassword),
+                'raw_password_exists' => !empty($rawPassword),
                 'raw_password_length' => $rawPassword ? strlen($rawPassword) : 0,
                 'action_required' => 'Please update the SMTP profile password in the admin panel',
             ]);
@@ -101,20 +101,18 @@ class LeadConfirmationService
         }
 
         // Configure mailer with SMTP profile
-        $mailer = $this->configureMailer($smtpProfile, $password);
+        $this->configureMailer($smtpProfile, $password);
 
         try {
-            // Send email synchronously (directly) without timeout restrictions
-            // If sending fails, it will be queued for retry
-            // Use send() with a view to properly send HTML email
-            $mailer->send([], [], function ($message) use ($lead, $smtpProfile, $subject, $bodyHtml, $bodyText) {
+            // Send email using Mail facade (supports Mail::fake() in tests)
+            Mail::send([], [], function ($message) use ($lead, $smtpProfile, $subject, $bodyHtml, $bodyText) {
                 $message->to($lead->email)
                     ->subject($subject)
                     ->from($smtpProfile->from_address, $smtpProfile->from_name)
                     ->html($bodyHtml);
 
                 // Add text version if available
-                if (! empty($bodyText)) {
+                if (!empty($bodyText)) {
                     $message->text($bodyText);
                 }
             });
@@ -199,7 +197,7 @@ class LeadConfirmationService
 
         foreach ($variables as $key => $value) {
             // Support both {{variable}} and {variable} syntax
-            $content = str_replace(['{{'.$key.'}}', '{'.$key.'}'], $value, $content);
+            $content = str_replace(['{{' . $key . '}}', '{' . $key . '}'], $value, $content);
         }
 
         return $content;
@@ -207,15 +205,20 @@ class LeadConfirmationService
 
     /**
      * Configure mailer with SMTP profile settings.
-     *
-     * @return \Illuminate\Mail\Mailer|\Illuminate\Support\Testing\Fakes\MailFake
      */
-    protected function configureMailer(SmtpProfile $smtpProfile, ?string $password = null)
+    protected function configureMailer(SmtpProfile $smtpProfile, ?string $password = null): void
     {
+        // If Mail is faked (for testing), don't change config
+        if (Mail::getFacadeRoot() instanceof \Illuminate\Support\Testing\Fakes\MailFake) {
+            return;
+        }
+
         // Use provided password or get from model (which will decrypt it)
         $decryptedPassword = $password ?? $smtpProfile->password;
 
-        $config = [
+        // Configure the default SMTP mailer
+        Config::set('mail.default', 'smtp');
+        Config::set('mail.mailers.smtp', [
             'transport' => 'smtp',
             'host' => $smtpProfile->host,
             'port' => $smtpProfile->port,
@@ -223,12 +226,7 @@ class LeadConfirmationService
             'username' => $smtpProfile->username,
             'password' => $decryptedPassword,
             'timeout' => null,
-        ];
-
-        // Create a temporary mailer configuration
-        Config::set('mail.mailers.dynamic_smtp', $config);
-
-        return Mail::mailer('dynamic_smtp');
+        ]);
     }
 
     /**
@@ -284,15 +282,15 @@ class LeadConfirmationService
             }
 
             try {
-                $mailer = $this->configureMailer($alternativeProfile, $password);
+                $this->configureMailer($alternativeProfile, $password);
 
-                $mailer->send([], [], function ($message) use ($lead, $alternativeProfile, $subject, $bodyHtml, $bodyText) {
+                Mail::send([], [], function ($message) use ($lead, $alternativeProfile, $subject, $bodyHtml, $bodyText) {
                     $message->to($lead->email)
                         ->subject($subject)
                         ->from($alternativeProfile->from_address, $alternativeProfile->from_name)
                         ->html($bodyHtml);
 
-                    if (! empty($bodyText)) {
+                    if (!empty($bodyText)) {
                         $message->text($bodyText);
                     }
                 });

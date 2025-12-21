@@ -158,7 +158,7 @@ class StatisticsService
     protected function getAgentPerformance(CallCenter $callCenter): Collection
     {
         $agents = User::where('call_center_id', $callCenter->id)
-            ->whereHas('role', fn ($q) => $q->where('slug', 'agent'))
+            ->whereHas('role', fn($q) => $q->where('slug', 'agent'))
             ->get();
 
         return $agents->map(function ($agent) {
@@ -224,10 +224,8 @@ class StatisticsService
         $threshold = Carbon::now()->subHours($hoursThreshold);
 
         $query = Lead::whereIn('status', ['email_confirmed', 'pending_call'])
-            ->where(function ($q) use ($threshold) {
-                $q->whereNull('called_at')
-                    ->orWhere('email_confirmed_at', '<=', $threshold);
-            });
+            ->whereNull('called_at')
+            ->where('email_confirmed_at', '<=', $threshold);
 
         if ($callCenter) {
             $query->where('call_center_id', $callCenter->id);
@@ -243,7 +241,7 @@ class StatisticsService
      */
     public function getUnderperformingAgents(?CallCenter $callCenter = null, float $minConversionRate = 20.0): Collection
     {
-        $query = User::whereHas('role', fn ($q) => $q->where('slug', 'agent'));
+        $query = User::whereHas('role', fn($q) => $q->where('slug', 'agent'));
 
         if ($callCenter) {
             $query->where('call_center_id', $callCenter->id);
