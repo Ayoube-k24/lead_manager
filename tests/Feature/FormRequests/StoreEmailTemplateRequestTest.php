@@ -145,3 +145,8 @@ describe('StoreEmailTemplateRequest', function () {
     });
 });
 
+
+
+
+
+

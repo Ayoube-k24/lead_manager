@@ -57,3 +57,8 @@ describe('SmtpProfile Model - Attributes', function () {
     });
 });
 
+
+
+
+
+

@@ -1,3 +1,8 @@
 Improve LeadConfirmationService email sending with password validation and enhanced logging
 
 
+
+
+
+
+

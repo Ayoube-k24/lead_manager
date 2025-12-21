@@ -66,9 +66,7 @@ new class extends Component
 
     public function updatedEmailEditorMode(): void
     {
-        if ($this->emailEditorMode === 'visual') {
-            $this->dispatch('email-editor-mode-changed', mode: 'visual');
-        }
+        $this->dispatch('email-editor-mode-changed', mode: $this->emailEditorMode);
     }
 
     public function mount(Lead $lead): void
@@ -313,6 +311,8 @@ new class extends Component
         $this->emailEditorMode = 'visual'; // Default to visual editor
         $this->showEmailPreview = false;
         $this->dispatch('email-modal-opened');
+        // Also dispatch mode change to ensure editor initializes
+        $this->dispatch('email-editor-mode-changed', mode: 'visual');
     }
 
     public function closeEmailModal(): void
@@ -1279,6 +1279,10 @@ new class extends Component
                         <div wire:ignore class="email-visual-editor-container w-full flex-1 flex flex-col min-h-[400px] sm:min-h-[500px] md:min-h-[600px]">
                             <div id="emailBodyEditor" class="w-full flex-1 border border-neutral-200 dark:border-neutral-700 rounded-lg" style="min-height: 400px;"></div>
                             <textarea id="emailBodyHidden" wire:model="emailBody" class="hidden"></textarea>
+                            <div id="emailEditorError" class="hidden mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-200">
+                                <p class="font-semibold">{{ __('L\'éditeur se charge...') }}</p>
+                                <p class="text-xs mt-1">{{ __('Si l\'éditeur n\'apparaît pas, vérifiez la console du navigateur (F12) pour plus d\'informations.') }}</p>
+                            </div>
                         </div>
                     @else
                         <flux:textarea wire:model.blur="emailBody" rows="12" required class="min-h-[300px] sm:min-h-[400px] md:min-h-[500px] w-full" />
@@ -1411,8 +1415,10 @@ new class extends Component
                 position: relative;
                 width: 100%;
                 flex: 1 1 auto;
-                display: flex;
+                display: flex !important;
                 flex-direction: column;
+                visibility: visible !important;
+                opacity: 1 !important;
                 min-height: 400px;
             }
             
@@ -1433,6 +1439,8 @@ new class extends Component
                 width: 100%;
                 flex: 1 1 auto;
                 display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
                 min-height: 400px;
             }
             
@@ -1496,8 +1504,17 @@ new class extends Component
             .gjs-editor {
                 min-height: 400px;
                 height: 100%;
-                display: flex;
+                display: flex !important;
                 flex-direction: column;
+                visibility: visible !important;
+                opacity: 1 !important;
+            }
+            
+            /* Ensure GrapesJS canvas is visible */
+            .gjs-cv-canvas {
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
             }
             
             @media (min-width: 640px) {
@@ -1532,9 +1549,13 @@ new class extends Component
                 let editorInstance = null;
                 let isInitializing = false;
                 let lastContent = '';
+                let initAttempts = 0;
+                const MAX_INIT_ATTEMPTS = 10;
 
                 // Initialize GrapesJS Email Editor
-                function initEmailEditor() {
+                function initEmailEditor(force = false) {
+                    initAttempts++;
+                    console.log(`GrapesJS: Init attempt ${initAttempts}`, { force });
                     const container = document.getElementById('emailBodyEditor');
                     const hiddenTextarea = document.getElementById('emailBodyHidden');
                     
@@ -1544,22 +1565,37 @@ new class extends Component
                     }
                     
                     // Check if already initialized
-                    if (editorInstance || isInitializing) {
-                        console.log('GrapesJS: Already initialized or initializing');
+                    if (editorInstance && !force) {
+                        console.log('GrapesJS: Already initialized');
+                        return;
+                    }
+                    
+                    if (isInitializing && !force) {
+                        console.log('GrapesJS: Already initializing');
                         return;
                     }
 
-                    // Check if container is visible
+                    // Check if container is visible - use multiple checks
                     const containerStyle = window.getComputedStyle(container);
-                    if (containerStyle.display === 'none' || container.offsetParent === null) {
-                        console.log('GrapesJS: Container is not visible');
+                    const parentContainer = container.closest('.email-visual-editor-container');
+                    const parentStyle = parentContainer ? window.getComputedStyle(parentContainer) : null;
+                    
+                    const isContainerVisible = containerStyle.display !== 'none' && 
+                                               container.offsetParent !== null &&
+                                               containerStyle.visibility !== 'hidden' &&
+                                               containerStyle.opacity !== '0' &&
+                                               (!parentStyle || (parentStyle.display !== 'none' && parentStyle.visibility !== 'hidden'));
+                    
+                    if (!isContainerVisible && !force) {
+                        console.log('GrapesJS: Container is not visible, retrying...');
+                        setTimeout(() => initEmailEditor(false), 500);
                         return;
                     }
 
                     // Check if GrapesJS is loaded
                     if (typeof grapesjs === 'undefined') {
                         console.log('GrapesJS: Library not loaded yet, retrying...');
-                        setTimeout(initEmailEditor, 500);
+                        setTimeout(() => initEmailEditor(force), 500);
                         return;
                     }
 
@@ -1567,18 +1603,38 @@ new class extends Component
                     if (!window.grapesjsPresetLoaded) {
                         console.log('GrapesJS: Preset not loaded yet, waiting...');
                         let timeoutId = setTimeout(() => {
-                            console.warn('GrapesJS: Preset loading timeout, trying to initialize anyway...');
+                            console.warn('GrapesJS: Preset loading timeout, trying to initialize with basic GrapesJS...');
+                            // Try to initialize without preset if it fails to load
                             window.grapesjsPresetLoaded = true; // Force continue
-                            initEmailEditor();
-                        }, 5000); // 5 second timeout
+                            initEmailEditor(force);
+                        }, 3000); // 3 second timeout (reduced from 5)
                         
                         const presetReadyHandler = () => {
                             clearTimeout(timeoutId);
                             window.removeEventListener('grapesjs-preset-ready', presetReadyHandler);
-                            setTimeout(initEmailEditor, 200);
+                            setTimeout(() => initEmailEditor(force), 200);
                         };
                         window.addEventListener('grapesjs-preset-ready', presetReadyHandler);
                         return;
+                    }
+                    
+                    // Double check that GrapesJS is really available
+                    if (typeof grapesjs === 'undefined') {
+                        console.error('GrapesJS: Library still not available after checks');
+                        if (initAttempts < MAX_INIT_ATTEMPTS) {
+                            setTimeout(() => initEmailEditor(force), 1000);
+                        }
+                        return;
+                    }
+
+                    // Destroy existing instance if forcing reinit
+                    if (force && editorInstance) {
+                        try {
+                            editorInstance.destroy();
+                        } catch (e) {
+                            console.error('Error destroying existing editor:', e);
+                        }
+                        editorInstance = null;
                     }
 
                     console.log('GrapesJS: Initializing editor...');
@@ -1593,16 +1649,36 @@ new class extends Component
                         const calculatedHeight = Math.max(400, Math.min(800, viewportHeight * 0.6));
                         const containerHeight = containerRect.height > 0 ? containerRect.height : calculatedHeight;
                         
-                        // Try to initialize with preset, fallback to basic if preset fails
-                        let plugins = ['gjs-preset-newsletter'];
-                        let pluginsOpts = {
-                            'gjs-preset-newsletter': {
-                                modalLabelImport: '{{ __('Importez votre template') }}',
-                                modalLabelExport: '{{ __('Exportez votre template') }}',
-                            },
-                        };
+                        // Ensure container is visible
+                        container.style.display = 'block';
+                        container.style.visibility = 'visible';
+                        container.style.opacity = '1';
+                        container.style.minHeight = '400px';
                         
-                        // Initialize GrapesJS with newsletter preset
+                        // Try to initialize with preset, fallback to basic if preset fails
+                        let plugins = [];
+                        let pluginsOpts = {};
+                        
+                        // Check if preset is available
+                        if (typeof window.gjsPresetNewsletter !== 'undefined' || window.grapesjsPresetLoaded) {
+                            try {
+                                plugins = ['gjs-preset-newsletter'];
+                                pluginsOpts = {
+                                    'gjs-preset-newsletter': {
+                                        modalLabelImport: '{{ __('Importez votre template') }}',
+                                        modalLabelExport: '{{ __('Exportez votre template') }}',
+                                    },
+                                };
+                                console.log('GrapesJS: Using newsletter preset');
+                            } catch (e) {
+                                console.warn('GrapesJS: Preset not available, using basic mode', e);
+                                plugins = [];
+                            }
+                        } else {
+                            console.warn('GrapesJS: Preset not available, using basic mode');
+                        }
+                        
+                        // Initialize GrapesJS with or without preset
                         editorInstance = grapesjs.init({
                             container: '#emailBodyEditor',
                             height: containerHeight + 'px',
@@ -1644,12 +1720,54 @@ new class extends Component
                             editorEl.style.visibility = 'visible';
                             editorEl.style.opacity = '1';
                         }
+                        
+                        // Also ensure the GrapesJS editor wrapper is visible
+                        const gjsEditor = document.querySelector('.gjs-editor');
+                        if (gjsEditor) {
+                            gjsEditor.style.display = 'flex';
+                            gjsEditor.style.visibility = 'visible';
+                            gjsEditor.style.opacity = '1';
+                        }
+                        
+                        // Force render after a short delay to ensure everything is set up
+                        setTimeout(() => {
+                            if (editorInstance) {
+                                try {
+                                    // Trigger a render
+                                    editorInstance.refresh();
+                                    const canvas = editorInstance.Canvas;
+                                    if (canvas) {
+                                        canvas.getFrameEl().style.display = 'block';
+                                        canvas.getFrameEl().style.visibility = 'visible';
+                                    }
+                                    
+                                    // Ensure panels are visible
+                                    const panels = document.querySelectorAll('.gjs-pn-panel');
+                                    panels.forEach(panel => {
+                                        panel.style.display = 'block';
+                                        panel.style.visibility = 'visible';
+                                    });
+                                    
+                                    console.log('GrapesJS: Editor rendered and visible');
+                                } catch (e) {
+                                    console.error('GrapesJS: Error forcing render', e);
+                                }
+                            }
+                        }, 500);
 
                         console.log('GrapesJS: Editor initialized successfully');
+                        
+                        // Hide error message if editor initialized successfully
+                        const errorMsg = document.getElementById('emailEditorError');
+                        if (errorMsg) {
+                            errorMsg.classList.add('hidden');
+                        }
 
                         // Load initial content if provided
                         if (initialContent) {
-                            loadContentIntoEditor(initialContent);
+                            setTimeout(() => {
+                                loadContentIntoEditor(initialContent);
+                            }, 300);
                         }
 
                         // Sync with Livewire on change
@@ -1663,6 +1781,28 @@ new class extends Component
                     } catch (e) {
                         console.error('Error initializing GrapesJS editor:', e);
                         isInitializing = false;
+                        
+                        // Show error message if max attempts reached
+                        if (initAttempts >= MAX_INIT_ATTEMPTS) {
+                            const errorMsg = document.getElementById('emailEditorError');
+                            if (errorMsg) {
+                                errorMsg.classList.remove('hidden');
+                                errorMsg.innerHTML = `
+                                    <p class="font-semibold">{{ __('Erreur lors du chargement de l\'éditeur') }}</p>
+                                    <p class="text-xs mt-1">{{ __('Veuillez rafraîchir la page ou utiliser le mode "Code HTML" à la place.') }}</p>
+                                    <p class="text-xs mt-1">Erreur: ${e.message}</p>
+                                `;
+                            }
+                            return;
+                        }
+                        
+                        // Retry after a delay if initialization failed
+                        setTimeout(() => {
+                            if (!editorInstance) {
+                                console.log('GrapesJS: Retrying initialization after error...');
+                                initEmailEditor(true);
+                            }
+                        }, 1000);
                     }
                 }
 
@@ -1770,36 +1910,101 @@ new class extends Component
                 }
 
                 // Function to check and initialize editor
-                function checkAndInitEditor() {
+                function checkAndInitEditor(force = false) {
                     const container = document.getElementById('emailBodyEditor');
                     if (!container) {
+                        console.log('GrapesJS: Container #emailBodyEditor not found in DOM');
                         if (editorInstance) {
                             destroyEmailEditor();
                         }
-                        return;
+                        return false;
                     }
 
                     // Check if we're in visual mode by checking if container is visible
                     const parentContainer = container.closest('.email-visual-editor-container');
                     if (!parentContainer) {
+                        console.log('GrapesJS: Parent container .email-visual-editor-container not found');
                         if (editorInstance) {
                             destroyEmailEditor();
                         }
-                        return;
+                        return false;
                     }
 
-                    // Check if container is visible
-                    const containerStyle = window.getComputedStyle(parentContainer);
-                    if (containerStyle.display === 'none') {
+                    // Check if container is visible - more thorough check
+                    const containerRect = container.getBoundingClientRect();
+                    const parentRect = parentContainer.getBoundingClientRect();
+                    const containerStyle = window.getComputedStyle(container);
+                    const parentStyle = window.getComputedStyle(parentContainer);
+                    
+                    const containerVisible = containerStyle.display !== 'none' && 
+                                             containerStyle.visibility !== 'hidden' &&
+                                             containerStyle.opacity !== '0' &&
+                                             container.offsetParent !== null &&
+                                             containerRect.width > 0 &&
+                                             containerRect.height > 0 &&
+                                             parentStyle.display !== 'none' &&
+                                             parentRect.width > 0 &&
+                                             parentRect.height > 0;
+                    
+                    console.log('GrapesJS: Container visibility check', {
+                        containerVisible,
+                        containerRect: { width: containerRect.width, height: containerRect.height },
+                        parentRect: { width: parentRect.width, height: parentRect.height },
+                        display: containerStyle.display,
+                        visibility: containerStyle.visibility,
+                        offsetParent: container.offsetParent !== null
+                    });
+                    
+                    if (!containerVisible && !force) {
+                        console.log('GrapesJS: Container not visible, will retry');
                         if (editorInstance) {
                             destroyEmailEditor();
                         }
-                        return;
+                        return false;
                     }
 
                     // In visual mode, initialize if needed
-                    if (!editorInstance && !isInitializing) {
-                        initEmailEditor();
+                    if (!editorInstance || force) {
+                        console.log('GrapesJS: Proceeding with initialization');
+                        // Wait a bit to ensure DOM is fully rendered
+                        setTimeout(() => {
+                            initEmailEditor(force);
+                        }, force ? 100 : 300);
+                        return true;
+                    }
+                    
+                    return true;
+                }
+                
+                // Use IntersectionObserver to detect when container becomes visible
+                function observeContainerVisibility() {
+                    const container = document.getElementById('emailBodyEditor');
+                    if (!container) {
+                        return;
+                    }
+                    
+                    const observer = new IntersectionObserver((entries) => {
+                        entries.forEach(entry => {
+                            if (entry.isIntersecting && entry.intersectionRatio > 0) {
+                                console.log('GrapesJS: Container became visible via IntersectionObserver');
+                                if (!editorInstance && !isInitializing) {
+                                    setTimeout(() => {
+                                        checkAndInitEditor(true);
+                                    }, 200);
+                                }
+                            }
+                        });
+                    }, {
+                        threshold: 0.1,
+                        rootMargin: '50px'
+                    });
+                    
+                    observer.observe(container);
+                    
+                    // Also observe parent container
+                    const parentContainer = container.closest('.email-visual-editor-container');
+                    if (parentContainer) {
+                        observer.observe(parentContainer);
                     }
                 }
 
@@ -1818,19 +2023,86 @@ new class extends Component
                         };
                         document.addEventListener('keydown', handleEscape);
                         
-                        // Initialize editor when modal opens (wait for modal to be fully rendered)
-                        // Use multiple attempts to ensure editor initializes
+                        // Set up visibility observer
                         setTimeout(() => {
-                            checkAndInitEditor();
+                            observeContainerVisibility();
+                        }, 100);
+                        
+                        // Initialize editor when modal opens (wait for modal to be fully rendered)
+                        // Use multiple attempts to ensure editor initializes, especially if in visual mode
+                        setTimeout(() => {
+                            checkAndInitEditor(true);
                         }, 300);
                         
                         setTimeout(() => {
-                            checkAndInitEditor();
+                            checkAndInitEditor(true);
                         }, 800);
                         
                         setTimeout(() => {
-                            checkAndInitEditor();
+                            checkAndInitEditor(true);
                         }, 1500);
+                        
+                        // Also try after a longer delay
+                        setTimeout(() => {
+                            checkAndInitEditor(true);
+                        }, 2500);
+                    });
+                    
+                    // Listen for clicks on the "Éditeur Email" button to force initialization
+                    document.addEventListener('click', (e) => {
+                        const target = e.target.closest('button');
+                        if (target && (target.textContent.includes('Éditeur Email') || target.textContent.includes('Email Editor'))) {
+                            console.log('GrapesJS: Éditeur Email button clicked');
+                            // Wait a bit for Livewire to update the mode
+                            setTimeout(() => {
+                                observeContainerVisibility();
+                                checkAndInitEditor(true);
+                            }, 200);
+                            setTimeout(() => {
+                                checkAndInitEditor(true);
+                            }, 600);
+                            setTimeout(() => {
+                                checkAndInitEditor(true);
+                            }, 1200);
+                        }
+                    });
+                    
+                    // Also use MutationObserver to watch for DOM changes in the modal
+                    function setupModalObserver() {
+                        const modal = document.querySelector('[wire\\:key="email-modal-content"]');
+                        if (!modal) {
+                            return;
+                        }
+                        
+                        const observer = new MutationObserver((mutations) => {
+                            const container = document.getElementById('emailBodyEditor');
+                            if (container && !editorInstance && !isInitializing) {
+                                const parentContainer = container.closest('.email-visual-editor-container');
+                                if (parentContainer) {
+                                    const style = window.getComputedStyle(parentContainer);
+                                    if (style.display !== 'none') {
+                                        console.log('GrapesJS: Modal content changed, checking for editor init');
+                                        setTimeout(() => {
+                                            checkAndInitEditor(true);
+                                        }, 300);
+                                    }
+                                }
+                            }
+                        });
+                        
+                        observer.observe(modal, {
+                            childList: true,
+                            subtree: true,
+                            attributes: true,
+                            attributeFilter: ['style', 'class']
+                        });
+                    }
+                    
+                    // Set up observer when modal opens
+                    Livewire.on('email-modal-opened', () => {
+                        setTimeout(() => {
+                            setupModalObserver();
+                        }, 200);
                     });
 
                     // Watch for modal closing
@@ -1859,11 +2131,43 @@ new class extends Component
                     // Watch for editor mode changes via Livewire event
                     Livewire.on('email-editor-mode-changed', (event) => {
                         if (event.mode === 'visual') {
+                            // Show loading message
+                            const errorMsg = document.getElementById('emailEditorError');
+                            if (errorMsg) {
+                                errorMsg.classList.remove('hidden');
+                                errorMsg.innerHTML = `
+                                    <p class="font-semibold">{{ __('L\'éditeur se charge...') }}</p>
+                                    <p class="text-xs mt-1">{{ __('Veuillez patienter quelques secondes.') }}</p>
+                                `;
+                            }
+                            
+                            // Force reinitialization when switching to visual mode
                             setTimeout(() => {
-                                checkAndInitEditor();
-                            }, 800);
-                        } else {
+                                checkAndInitEditor(true);
+                            }, 200);
+                            setTimeout(() => {
+                                checkAndInitEditor(true);
+                            }, 600);
+                            setTimeout(() => {
+                                checkAndInitEditor(true);
+                            }, 1200);
+                        } else if (event.mode === 'html') {
+                            // Hide error message and destroy editor when switching to HTML mode
+                            const errorMsg = document.getElementById('emailEditorError');
+                            if (errorMsg) {
+                                errorMsg.classList.add('hidden');
+                            }
                             destroyEmailEditor();
+                        }
+                    });
+                    
+                    // Also watch for Livewire property updates
+                    Livewire.hook('morph', ({ el, component }) => {
+                        // Check if emailEditorMode changed to visual
+                        if (component && component.get && component.get('emailEditorMode') === 'visual') {
+                            setTimeout(() => {
+                                checkAndInitEditor(true);
+                            }, 300);
                         }
                     });
                     

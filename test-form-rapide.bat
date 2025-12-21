@@ -28,3 +28,8 @@ echo Test termine!
 pause
 
 
+
+
+
+
+

@@ -44,3 +44,8 @@ describe('EmailTemplate Model - Attributes', function () {
     });
 });
 
+
+
+
+
+
