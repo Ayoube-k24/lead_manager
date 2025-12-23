@@ -170,9 +170,3 @@ describe('Lead Model - Data Management', function () {
             ->and($lead->data['email'])->toBe('jane@example.com');
     });
 });
-
-
-
-
-
-

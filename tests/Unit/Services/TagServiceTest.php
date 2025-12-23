@@ -10,7 +10,7 @@ use App\Services\TagService;
 
 describe('TagService', function () {
     beforeEach(function () {
-        $this->service = new TagService();
+        $this->service = new TagService;
     });
 
     describe('createTag', function () {
@@ -171,11 +171,3 @@ describe('TagService', function () {
         });
     });
 });
-
-
-
-
-
-
-
-

@@ -118,9 +118,3 @@ describe('UpdateEmailTemplateRequest', function () {
         expect($validator->fails())->toBeFalse();
     });
 });
-
-
-
-
-
-

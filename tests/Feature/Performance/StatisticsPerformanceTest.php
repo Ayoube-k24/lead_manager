@@ -8,11 +8,10 @@ use App\Models\Lead;
 use App\Models\LeadStatus;
 use App\Models\User;
 use App\Services\StatisticsService;
-use Illuminate\Support\Facades\DB;
 
 describe('Statistics Performance', function () {
     beforeEach(function () {
-        $this->statisticsService = new StatisticsService();
+        $this->statisticsService = new StatisticsService;
     });
 
     test('calculates global statistics efficiently with large dataset', function () {
@@ -96,7 +95,7 @@ describe('Statistics Performance', function () {
         $callCenter = CallCenter::factory()->create();
         $form = Form::factory()->create(['call_center_id' => $callCenter->id]);
         $agentRole = \App\Models\Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent']);
-        
+
         $agent = User::factory()->create([
             'role_id' => $agentRole->id,
             'call_center_id' => $callCenter->id,
@@ -162,10 +161,3 @@ describe('Statistics Performance', function () {
             ->and($stats)->toHaveKey('total_leads');
     });
 });
-
-
-
-
-
-
-

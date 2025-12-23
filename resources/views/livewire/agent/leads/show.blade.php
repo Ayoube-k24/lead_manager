@@ -1963,6 +1963,17 @@ new class extends Component
                         return false;
                     }
 
+                    // Force container to be visible before initialization
+                    if (force || !editorInstance) {
+                        container.style.display = 'block';
+                        container.style.visibility = 'visible';
+                        container.style.opacity = '1';
+                        container.style.minHeight = '400px';
+                        parentContainer.style.display = 'flex';
+                        parentContainer.style.visibility = 'visible';
+                        parentContainer.style.opacity = '1';
+                    }
+                    
                     // In visual mode, initialize if needed
                     if (!editorInstance || force) {
                         console.log('GrapesJS: Proceeding with initialization');
@@ -2130,6 +2141,7 @@ new class extends Component
 
                     // Watch for editor mode changes via Livewire event
                     Livewire.on('email-editor-mode-changed', (event) => {
+                        console.log('GrapesJS: Mode changed to', event.mode);
                         if (event.mode === 'visual') {
                             // Show loading message
                             const errorMsg = document.getElementById('emailEditorError');
@@ -2141,17 +2153,37 @@ new class extends Component
                                 `;
                             }
                             
-                            // Force reinitialization when switching to visual mode
+                            // Force container to be visible immediately
+                            const container = document.getElementById('emailBodyEditor');
+                            const parentContainer = container?.closest('.email-visual-editor-container');
+                            if (container && parentContainer) {
+                                container.style.display = 'block';
+                                container.style.visibility = 'visible';
+                                container.style.opacity = '1';
+                                container.style.minHeight = '400px';
+                                parentContainer.style.display = 'flex';
+                                parentContainer.style.visibility = 'visible';
+                                parentContainer.style.opacity = '1';
+                            }
+                            
+                            // Wait a bit for Livewire to update the DOM, then initialize
                             setTimeout(() => {
+                                console.log('GrapesJS: Initializing editor after mode change to visual (attempt 1)');
                                 checkAndInitEditor(true);
                             }, 200);
                             setTimeout(() => {
+                                console.log('GrapesJS: Initializing editor after mode change to visual (attempt 2)');
                                 checkAndInitEditor(true);
                             }, 600);
                             setTimeout(() => {
+                                console.log('GrapesJS: Initializing editor after mode change to visual (attempt 3)');
                                 checkAndInitEditor(true);
                             }, 1200);
-                        } else if (event.mode === 'html') {
+                            setTimeout(() => {
+                                console.log('GrapesJS: Initializing editor after mode change to visual (attempt 4)');
+                                checkAndInitEditor(true);
+                            }, 2000);
+                        } else {
                             // Hide error message and destroy editor when switching to HTML mode
                             const errorMsg = document.getElementById('emailEditorError');
                             if (errorMsg) {

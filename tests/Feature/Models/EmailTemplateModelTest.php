@@ -43,9 +43,3 @@ describe('EmailTemplate Model - Attributes', function () {
         expect($template->variables)->toHaveCount(4);
     });
 });
-
-
-
-
-
-

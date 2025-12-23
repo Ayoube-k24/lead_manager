@@ -14,9 +14,3 @@ describe('LeadEmailConfirmed Event', function () {
             ->and($event->lead->id)->toBe($lead->id);
     });
 });
-
-
-
-
-
-

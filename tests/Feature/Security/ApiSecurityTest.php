@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Models\ApiToken;
 use App\Models\CallCenter;
 use App\Models\Form;
-use App\Models\Role;
 use App\Models\User;
 
 describe('API Security', function () {
@@ -131,7 +130,7 @@ describe('API Security', function () {
     test('prevents API access with token from different user', function () {
         $user1 = User::factory()->create();
         $user2 = User::factory()->create();
-        
+
         $token1 = ApiToken::factory()->create([
             'user_id' => $user1->id,
             'expires_at' => null,
@@ -155,7 +154,7 @@ describe('API Security', function () {
     test('allows users to manage only their own API tokens', function () {
         $user1 = User::factory()->create();
         $user2 = User::factory()->create();
-        
+
         $token1 = ApiToken::factory()->create([
             'user_id' => $user1->id,
             'expires_at' => null,
@@ -176,10 +175,3 @@ describe('API Security', function () {
             ->and($tokens[0]['id'])->toBe($token1->id);
     });
 });
-
-
-
-
-
-
-

@@ -119,9 +119,3 @@ class MobileAuthController extends Controller
         ]);
     }
 }
-
-
-
-
-
-

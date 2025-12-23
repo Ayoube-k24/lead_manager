@@ -3,12 +3,11 @@
 declare(strict_types=1);
 
 use App\Services\SmtpTestService;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Mail;
 
 describe('SmtpTestService', function () {
     beforeEach(function () {
-        $this->service = new SmtpTestService();
+        $this->service = new SmtpTestService;
         Mail::fake();
     });
 
@@ -90,11 +89,3 @@ describe('SmtpTestService', function () {
         });
     });
 });
-
-
-
-
-
-
-
-

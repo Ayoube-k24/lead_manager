@@ -18,9 +18,3 @@ describe('Api\UpdateFormRequest', function () {
             ->and($request->rules())->toBeEmpty();
     });
 });
-
-
-
-
-
-

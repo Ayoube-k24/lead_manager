@@ -144,9 +144,3 @@ describe('StoreEmailTemplateRequest', function () {
         expect($validator->fails())->toBeFalse();
     });
 });
-
-
-
-
-
-

@@ -73,9 +73,3 @@ class LeadEmail extends Model
         return ! empty($this->attachment_path);
     }
 }
-
-
-
-
-
-

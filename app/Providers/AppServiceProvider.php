@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Models\Lead;
+use App\Models\User;
 use App\Observers\LeadObserver;
+use App\Observers\UserObserver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -34,6 +36,7 @@ class AppServiceProvider extends ServiceProvider
     private function registerObservers(): void
     {
         Lead::observe(LeadObserver::class);
+        User::observe(UserObserver::class);
     }
 
     /**

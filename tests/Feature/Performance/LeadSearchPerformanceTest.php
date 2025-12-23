@@ -7,18 +7,17 @@ use App\Models\Form;
 use App\Models\Lead;
 use App\Models\LeadStatus;
 use App\Services\LeadSearchService;
-use Illuminate\Support\Facades\DB;
 
 describe('Lead Search Performance', function () {
     beforeEach(function () {
-        $this->searchService = new LeadSearchService();
+        $this->searchService = new LeadSearchService;
     });
 
     test('searches efficiently with large dataset', function () {
         // Create a large dataset
         $callCenter = CallCenter::factory()->create();
         $form = Form::factory()->create(['call_center_id' => $callCenter->id]);
-        
+
         // Create 1000 leads
         Lead::factory()->count(1000)->create([
             'form_id' => $form->id,
@@ -30,9 +29,9 @@ describe('Lead Search Performance', function () {
 
         // Measure search performance
         $startTime = microtime(true);
-        
+
         $results = $this->searchService->search('test', [], 15);
-        
+
         $endTime = microtime(true);
         $executionTime = ($endTime - $startTime) * 1000; // Convert to milliseconds
 
@@ -132,10 +131,3 @@ describe('Lead Search Performance', function () {
             ->and($results->count())->toBeGreaterThan(0);
     });
 });
-
-
-
-
-
-
-

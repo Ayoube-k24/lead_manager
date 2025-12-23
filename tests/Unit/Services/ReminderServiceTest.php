@@ -6,11 +6,10 @@ use App\Models\Lead;
 use App\Models\LeadReminder;
 use App\Models\User;
 use App\Services\ReminderService;
-use Carbon\Carbon;
 
 describe('ReminderService', function () {
     beforeEach(function () {
-        $this->service = new ReminderService();
+        $this->service = new ReminderService;
     });
 
     describe('scheduleReminder', function () {
@@ -198,11 +197,3 @@ describe('ReminderService', function () {
         });
     });
 });
-
-
-
-
-
-
-
-
