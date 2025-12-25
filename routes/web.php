@@ -130,6 +130,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('owner.agents.stats');
         Volt::route('owner/leads', 'owner.leads')
             ->name('owner.leads');
+        Volt::route('owner/leads/reassign', 'owner.leads.reassign')
+            ->name('owner.leads.reassign');
         Volt::route('owner/leads/{lead}', 'owner.leads.show')
             ->name('owner.leads.show');
         Volt::route('owner/leads/{lead}/assign', 'owner.leads.assign')

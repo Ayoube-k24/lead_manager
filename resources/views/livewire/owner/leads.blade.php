@@ -30,17 +30,6 @@ new class extends Component
 
     public bool $showAssignModal = false;
 
-    public ?int $reassignAgentId = null;
-
-    public ?int $reassignToAgentId = null;
-
-    public bool $showReassignModal = false;
-
-    public ?int $reassignCount = null;
-
-    public string $reassignMode = 'all'; // 'all' or 'count'
-
-    public array $reassignStatuses = ['pending_call', 'email_confirmed', 'callback_pending'];
 
     public function mount(): void
     {
@@ -251,7 +240,8 @@ new class extends Component
         }
 
         if ($distributionService->assignToAgent($lead, $agent)) {
-            if ($lead->status === 'email_confirmed') {
+            // Changer le statut en pending_call si le lead est en pending_email ou email_confirmed
+            if (in_array($lead->status, ['pending_email', 'email_confirmed'])) {
                 $lead->markAsPendingCall();
             }
             $this->closeAssignModal();
@@ -273,143 +263,15 @@ new class extends Component
         $agent = $distributionService->distributeLead($lead);
         if ($agent) {
             $distributionService->assignToAgent($lead, $agent);
-            if ($lead->status === 'email_confirmed') {
+            // Changer le statut en pending_call si le lead est en pending_email ou email_confirmed
+            if (in_array($lead->status, ['pending_email', 'email_confirmed'])) {
                 $lead->markAsPendingCall();
             }
             $this->dispatch('lead-assigned');
         }
     }
 
-    public function reassignUntreatedLeads(LeadDistributionService $distributionService): void
-    {
-        $rules = [
-            'reassignAgentId' => ['required', 'exists:users,id'],
-            'reassignMode' => ['required', 'in:all,count'],
-            'reassignStatuses' => ['required', 'array', 'min:1'],
-            'reassignStatuses.*' => ['required', 'string', 'in:pending_call,email_confirmed,callback_pending'],
-        ];
 
-        if ($this->reassignMode === 'count') {
-            $rules['reassignCount'] = ['required', 'integer', 'min:1'];
-        }
-
-        $this->validate($rules);
-
-        if (empty($this->reassignStatuses)) {
-            $this->addError('reassignStatuses', __('Veuillez sélectionner au moins un type de lead à réassigner.'));
-            return;
-        }
-
-        $user = Auth::user();
-        $fromAgent = User::findOrFail($this->reassignAgentId);
-
-        // Vérifier que l'agent appartient au centre d'appels du owner
-        if ($fromAgent->call_center_id !== $user->call_center_id) {
-            $this->dispatch('error', message: __('Vous n\'êtes pas autorisé à réassigner les leads de cet agent.'));
-            $this->closeReassignModal();
-            return;
-        }
-
-        $toAgent = $this->reassignToAgentId ? User::findOrFail($this->reassignToAgentId) : null;
-
-        if ($toAgent && $toAgent->call_center_id !== $user->call_center_id) {
-            $this->dispatch('error', message: __('L\'agent de destination doit appartenir à votre centre d\'appels.'));
-            $this->closeReassignModal();
-            return;
-        }
-
-        $maxCount = $this->reassignMode === 'count' ? $this->reassignCount : null;
-        
-        try {
-            $result = $distributionService->reassignUntreatedLeads($fromAgent, $toAgent, $user->call_center_id, $maxCount, $this->reassignStatuses);
-
-            if ($result['reassigned'] === 0 && $result['failed'] === 0 && $result['unassigned'] === 0) {
-                $this->dispatch('warning', message: __('Aucun lead trouvé à réassigner avec les critères sélectionnés.'));
-            } else {
-                $message = __('Réassignation terminée: :reassigned réassignés, :failed échecs, :unassigned non assignés.', [
-                    'reassigned' => $result['reassigned'],
-                    'failed' => $result['failed'],
-                    'unassigned' => $result['unassigned'],
-                ]);
-
-                if ($result['reassigned'] > 0) {
-                    $this->dispatch('success', message: $message);
-                } else {
-                    $this->dispatch('warning', message: $message);
-                }
-            }
-        } catch (\Exception $e) {
-            \Log::error('Error in reassignUntreatedLeads method', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-            $this->dispatch('error', message: __('Erreur lors de la réassignation: :error', ['error' => $e->getMessage()]));
-        }
-
-        $this->closeReassignModal();
-        $this->resetPage();
-    }
-
-    public function openReassignModal(int $agentId): void
-    {
-        $this->reassignAgentId = $agentId;
-        $this->reassignToAgentId = null;
-        $this->reassignCount = null;
-        $this->reassignMode = 'all';
-        $this->reassignStatuses = ['pending_call', 'email_confirmed', 'callback_pending'];
-        $this->showReassignModal = true;
-    }
-
-    public function closeReassignModal(): void
-    {
-        $this->showReassignModal = false;
-        $this->reassignAgentId = null;
-        $this->reassignToAgentId = null;
-        $this->reassignCount = null;
-        $this->reassignMode = 'all';
-        $this->reassignStatuses = ['pending_call', 'email_confirmed', 'callback_pending'];
-    }
-
-    public function toggleReassignStatus(string $status): void
-    {
-        if (in_array($status, $this->reassignStatuses)) {
-            $this->reassignStatuses = array_values(array_diff($this->reassignStatuses, [$status]));
-        } else {
-            $this->reassignStatuses[] = $status;
-        }
-    }
-
-    public function getSelectedLeadsCountProperty(): int
-    {
-        if (! $this->reassignAgentId || empty($this->reassignStatuses)) {
-            return 0;
-        }
-
-        $user = Auth::user();
-        $callCenterId = $user->call_center_id;
-
-        $count = 0;
-        if (in_array('pending_call', $this->reassignStatuses)) {
-            $count += \App\Models\Lead::where('assigned_to', $this->reassignAgentId)
-                ->where('status', 'pending_call')
-                ->when($callCenterId, fn($q) => $q->where('call_center_id', $callCenterId))
-                ->count();
-        }
-        if (in_array('email_confirmed', $this->reassignStatuses)) {
-            $count += \App\Models\Lead::where('assigned_to', $this->reassignAgentId)
-                ->where('status', 'email_confirmed')
-                ->when($callCenterId, fn($q) => $q->where('call_center_id', $callCenterId))
-                ->count();
-        }
-        if (in_array('callback_pending', $this->reassignStatuses)) {
-            $count += \App\Models\Lead::where('assigned_to', $this->reassignAgentId)
-                ->where('status', 'callback_pending')
-                ->when($callCenterId, fn($q) => $q->where('call_center_id', $callCenterId))
-                ->count();
-        }
-
-        return $count;
-    }
 
     public function toggleTag(int $tagId): void
     {
@@ -421,6 +283,7 @@ new class extends Component
         }
         $this->resetPage();
     }
+
 }; ?>
 
 <div class="flex h-full w-full flex-1 flex-col gap-6">
@@ -553,145 +416,6 @@ new class extends Component
         @endif
     </div>
 
-    <!-- Section de réassignation rapide -->
-    <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
-        <div class="flex items-center justify-between">
-            <div>
-                <h2 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-                    {{ __('Réassignation des Leads en Attente') }}
-                </h2>
-                <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-                    {{ __('Réassignez les leads non traités (en attente d\'appel, email confirmé, rappel programmé) d\'un agent à un autre agent ou via distribution automatique') }}
-                </p>
-            </div>
-        </div>
-
-        <!-- Liste des agents avec leurs leads en attente -->
-        <div class="mt-4">
-            <div class="mb-3 flex items-center justify-between">
-                <p class="text-sm text-neutral-600 dark:text-neutral-400">
-                    {{ __('Total d\'agents') }}: <strong>{{ $this->agents->count() }}</strong>
-                </p>
-                <button
-                    type="button"
-                    wire:click="$refresh"
-                    class="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400"
-                >
-                    {{ __('Actualiser') }}
-                </button>
-            </div>
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                @foreach ($this->agents as $agent)
-                @php
-                    $user = Auth::user();
-                    $callCenterId = $user->call_center_id;
-                    $untreatedStatuses = config('lead-rules.reassignment.untreated_statuses', ['pending_call', 'email_confirmed', 'callback_pending']);
-                    $pendingCallCount = \App\Models\Lead::where('assigned_to', $agent->id)
-                        ->where('status', 'pending_call')
-                        ->when($callCenterId, fn($q) => $q->where('call_center_id', $callCenterId))
-                        ->count();
-                    $emailConfirmedCount = \App\Models\Lead::where('assigned_to', $agent->id)
-                        ->where('status', 'email_confirmed')
-                        ->when($callCenterId, fn($q) => $q->where('call_center_id', $callCenterId))
-                        ->count();
-                    $callbackPendingCount = \App\Models\Lead::where('assigned_to', $agent->id)
-                        ->where('status', 'callback_pending')
-                        ->when($callCenterId, fn($q) => $q->where('call_center_id', $callCenterId))
-                        ->count();
-                    $untreatedCount = $pendingCallCount + $emailConfirmedCount + $callbackPendingCount;
-                @endphp
-                @if ($untreatedCount > 0)
-                    <div class="rounded-lg border border-orange-200 bg-orange-50 p-4 dark:border-orange-700 dark:bg-orange-900/20">
-                        <div class="flex items-start justify-between">
-                            <div class="flex-1">
-                                <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-                                    {{ $agent->name }}
-                                </h3>
-                                <div class="mt-2 space-y-1">
-                                    @if ($pendingCallCount > 0)
-                                        <div class="flex items-center gap-2 text-xs">
-                                            <span class="inline-flex h-2 w-2 rounded-full bg-orange-500"></span>
-                                            <span class="text-neutral-700 dark:text-neutral-300">
-                                                <strong>{{ $pendingCallCount }}</strong> {{ __('en attente d\'appel') }}
-                                            </span>
-                                        </div>
-                                    @endif
-                                    @if ($emailConfirmedCount > 0)
-                                        <div class="flex items-center gap-2 text-xs">
-                                            <span class="inline-flex h-2 w-2 rounded-full bg-blue-500"></span>
-                                            <span class="text-neutral-600 dark:text-neutral-400">
-                                                {{ $emailConfirmedCount }} {{ __('email confirmé') }}
-                                            </span>
-                                        </div>
-                                    @endif
-                                    @if ($callbackPendingCount > 0)
-                                        <div class="flex items-center gap-2 text-xs">
-                                            <span class="inline-flex h-2 w-2 rounded-full bg-yellow-500"></span>
-                                            <span class="text-neutral-600 dark:text-neutral-400">
-                                                {{ $callbackPendingCount }} {{ __('rappel programmé') }}
-                                            </span>
-                                        </div>
-                                    @endif
-                                </div>
-                                <p class="mt-2 text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                                    {{ __('Total') }}: <strong>{{ $untreatedCount }}</strong> {{ __('lead(s) non traité(s)') }}
-                                </p>
-                            </div>
-                            <flux:button
-                                type="button"
-                                wire:click="openReassignModal({{ $agent->id }})"
-                                variant="primary"
-                                size="sm"
-                                class="ml-3"
-                            >
-                                {{ __('Réassigner') }}
-                            </flux:button>
-                        </div>
-                    </div>
-                @endif
-                @endforeach
-            </div>
-            
-            <!-- Debug: Afficher tous les agents même sans leads -->
-            @if ($this->agents->filter(fn($agent) => $agent->pending_leads_count == 0)->isNotEmpty())
-                <div class="mt-4 rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-900">
-                    <p class="mb-2 text-xs font-semibold text-neutral-700 dark:text-neutral-300">
-                        {{ __('Agents sans leads en attente') }}
-                    </p>
-                    <div class="flex flex-wrap gap-2">
-                        @foreach ($this->agents->filter(fn($agent) => $agent->pending_leads_count == 0) as $agent)
-                            <span class="inline-flex items-center gap-1 rounded-full bg-neutral-200 px-2 py-1 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
-                                {{ $agent->name }}
-                                <span class="text-neutral-400">(0)</span>
-                            </span>
-                        @endforeach
-                    </div>
-                </div>
-            @endif
-        </div>
-
-        @php
-            $user = Auth::user();
-            $callCenterId = $user->call_center_id;
-            $agentsWithLeads = $this->agents->filter(fn($agent) => \App\Models\Lead::where('assigned_to', $agent->id)
-                ->whereIn('status', config('lead-rules.reassignment.untreated_statuses', ['pending_call', 'email_confirmed', 'callback_pending']))
-                ->when($callCenterId, fn($q) => $q->where('call_center_id', $callCenterId))
-                ->count() > 0);
-        @endphp
-        @if ($agentsWithLeads->isEmpty())
-            <div class="mt-4 rounded-lg border border-neutral-200 bg-neutral-50 p-4 text-center dark:border-neutral-700 dark:bg-neutral-900">
-                <p class="text-sm text-neutral-600 dark:text-neutral-400">
-                    {{ __('Aucun agent avec des leads non traités pour le moment.') }}
-                </p>
-                @if ($this->agents->isNotEmpty())
-                    <p class="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
-                        {{ __('Agents disponibles') }}: {{ $this->agents->pluck('name')->join(', ') }}
-                    </p>
-                @endif
-            </div>
-        @endif
-    </div>
-
     <!-- Liste des leads -->
     <div class="rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
         <div class="overflow-x-auto">
@@ -770,11 +494,27 @@ new class extends Component
                                 {{ $lead->assignedAgent?->name ?? __('Non assigné') }}
                             </td>
                             <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                                @if (! $lead->assigned_to && in_array($lead->status, ['email_confirmed', 'pending_call']))
-                                    @php
-                                        $callCenter = $this->callCenter;
-                                        $isManualMode = $callCenter && $callCenter->distribution_method === 'manual';
-                                    @endphp
+                                @php
+                                    $callCenter = $this->callCenter;
+                                    $isManualMode = $callCenter && $callCenter->distribution_method === 'manual';
+                                    $distributionTiming = $callCenter?->distribution_timing ?? 'after_email_confirmation';
+                                    
+                                    // Déterminer les statuts distribuables selon le mode et le timing
+                                    if ($isManualMode) {
+                                        // Mode manuel : respecter le timing de distribution
+                                        if ($distributionTiming === 'after_registration') {
+                                            // Après inscription : on peut assigner dès pending_email
+                                            $distributableStatuses = ['pending_email', 'email_confirmed', 'pending_call'];
+                                        } else {
+                                            // Après validation email : on ne peut assigner qu'après email_confirmed
+                                            $distributableStatuses = ['email_confirmed', 'pending_call'];
+                                        }
+                                    } else {
+                                        // Mode automatique : seulement après email_confirmed
+                                        $distributableStatuses = ['email_confirmed', 'pending_call'];
+                                    }
+                                @endphp
+                                @if (! $lead->assigned_to && in_array($lead->status, $distributableStatuses))
                                     <div class="flex items-center justify-end gap-2">
                                         @if (! $isManualMode)
                                             {{-- Mode automatique : afficher le bouton Auto pour forcer la distribution --}}
@@ -874,15 +614,6 @@ new class extends Component
                                             style="width: {{ min($percentage, 100) }}%"
                                         ></div>
                                     </div>
-                                    <flux:button
-                                        type="button"
-                                        wire:click="openReassignModal({{ $agent->id }})"
-                                        variant="ghost"
-                                        size="sm"
-                                        class="text-xs"
-                                    >
-                                        {{ __('Réassigner') }}
-                                    </flux:button>
                                 @endif
                             </div>
                         </div>
@@ -901,241 +632,7 @@ new class extends Component
         </form>
     </flux:modal>
 
-    <!-- Modal de réassignation en masse -->
-    <flux:modal name="reassign-modal" :show="$showReassignModal" wire:model="showReassignModal">
-        <form wire:submit.prevent="reassignUntreatedLeads" class="space-y-6">
-            <div>
-                <h2 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-                    {{ __('Réassigner les leads non traités') }}
-                </h2>
-                <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-                    {{ __('Réassigner tous les leads non traités (en attente d\'appel, email confirmé, rappel programmé) de cet agent à un autre agent ou distribution automatique.') }}
-                </p>
-            </div>
 
-            @if ($reassignAgentId)
-                @php
-                    $user = Auth::user();
-                    $callCenterId = $user->call_center_id;
-                    $agent = $this->agents->firstWhere('id', $reassignAgentId);
-                    $pendingCallCount = \App\Models\Lead::where('assigned_to', $reassignAgentId)
-                        ->where('status', 'pending_call')
-                        ->when($callCenterId, fn($q) => $q->where('call_center_id', $callCenterId))
-                        ->count();
-                    $emailConfirmedCount = \App\Models\Lead::where('assigned_to', $reassignAgentId)
-                        ->where('status', 'email_confirmed')
-                        ->when($callCenterId, fn($q) => $q->where('call_center_id', $callCenterId))
-                        ->count();
-                    $callbackPendingCount = \App\Models\Lead::where('assigned_to', $reassignAgentId)
-                        ->where('status', 'callback_pending')
-                        ->when($callCenterId, fn($q) => $q->where('call_center_id', $callCenterId))
-                        ->count();
-                    $untreatedCount = $pendingCallCount + $emailConfirmedCount + $callbackPendingCount;
-                    
-                    // Utiliser la propriété computed pour le nombre sélectionné
-                    $selectedCount = $this->selectedLeadsCount;
-                @endphp
-                <div class="rounded-lg border border-orange-200 bg-orange-50 p-4 dark:border-orange-700 dark:bg-orange-900/20">
-                    <p class="mb-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-                        {{ __('Agent') }}: <strong>{{ $agent->name }}</strong>
-                    </p>
-                    <div class="space-y-2 text-sm">
-                        @if ($pendingCallCount > 0)
-                            <div class="flex items-center justify-between">
-                                <span class="flex items-center gap-2 text-neutral-700 dark:text-neutral-300">
-                                    <span class="inline-flex h-2 w-2 rounded-full bg-orange-500"></span>
-                                    {{ __('En attente d\'appel') }}
-                                </span>
-                                <span class="font-semibold text-orange-600 dark:text-orange-400">{{ $pendingCallCount }}</span>
-                            </div>
-                        @endif
-                        @if ($emailConfirmedCount > 0)
-                            <div class="flex items-center justify-between">
-                                <span class="flex items-center gap-2 text-neutral-600 dark:text-neutral-400">
-                                    <span class="inline-flex h-2 w-2 rounded-full bg-blue-500"></span>
-                                    {{ __('Email confirmé') }}
-                                </span>
-                                <span class="font-semibold text-blue-600 dark:text-blue-400">{{ $emailConfirmedCount }}</span>
-                            </div>
-                        @endif
-                        @if ($callbackPendingCount > 0)
-                            <div class="flex items-center justify-between">
-                                <span class="flex items-center gap-2 text-neutral-600 dark:text-neutral-400">
-                                    <span class="inline-flex h-2 w-2 rounded-full bg-yellow-500"></span>
-                                    {{ __('Rappel programmé') }}
-                                </span>
-                                <span class="font-semibold text-yellow-600 dark:text-yellow-400">{{ $callbackPendingCount }}</span>
-                            </div>
-                        @endif
-                        <div class="mt-3 border-t border-neutral-200 pt-2 dark:border-neutral-700">
-                            <div class="flex items-center justify-between font-semibold">
-                                <span class="text-neutral-900 dark:text-neutral-100">{{ __('Total disponible') }}</span>
-                                <span class="text-orange-600 dark:text-orange-400">{{ $untreatedCount }}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            @endif
-
-            <!-- Choix des types de leads à réassigner -->
-            <div class="space-y-3">
-                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                    {{ __('Types de leads à réassigner') }}
-                </label>
-                <div class="space-y-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-900">
-                    <label class="flex cursor-pointer items-center justify-between gap-3 rounded p-2 transition-colors hover:bg-white dark:hover:bg-neutral-800">
-                        <div class="flex items-center gap-3">
-                            <input
-                                type="checkbox"
-                                wire:model="reassignStatuses"
-                                value="pending_call"
-                                class="h-4 w-4 rounded border-neutral-300 text-orange-600 focus:ring-orange-500"
-                            />
-                            <div class="flex items-center gap-2">
-                                <span class="inline-flex h-2 w-2 rounded-full bg-orange-500"></span>
-                                <span class="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                                    {{ __('En attente d\'appel') }}
-                                </span>
-                            </div>
-                        </div>
-                        @if ($reassignAgentId)
-                            <span class="text-xs text-neutral-500 dark:text-neutral-400">
-                                {{ $pendingCallCount }} {{ __('lead(s)') }}
-                            </span>
-                        @endif
-                    </label>
-                    <label class="flex cursor-pointer items-center justify-between gap-3 rounded p-2 transition-colors hover:bg-white dark:hover:bg-neutral-800">
-                        <div class="flex items-center gap-3">
-                            <input
-                                type="checkbox"
-                                wire:model="reassignStatuses"
-                                value="email_confirmed"
-                                class="h-4 w-4 rounded border-neutral-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            <div class="flex items-center gap-2">
-                                <span class="inline-flex h-2 w-2 rounded-full bg-blue-500"></span>
-                                <span class="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                                    {{ __('Email confirmé') }}
-                                </span>
-                            </div>
-                        </div>
-                        @if ($reassignAgentId)
-                            <span class="text-xs text-neutral-500 dark:text-neutral-400">
-                                {{ $emailConfirmedCount }} {{ __('lead(s)') }}
-                            </span>
-                        @endif
-                    </label>
-                    <label class="flex cursor-pointer items-center justify-between gap-3 rounded p-2 transition-colors hover:bg-white dark:hover:bg-neutral-800">
-                        <div class="flex items-center gap-3">
-                            <input
-                                type="checkbox"
-                                wire:model="reassignStatuses"
-                                value="callback_pending"
-                                class="h-4 w-4 rounded border-neutral-300 text-yellow-600 focus:ring-yellow-500"
-                            />
-                            <div class="flex items-center gap-2">
-                                <span class="inline-flex h-2 w-2 rounded-full bg-yellow-500"></span>
-                                <span class="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                                    {{ __('Rappel programmé') }}
-                                </span>
-                            </div>
-                        </div>
-                        @if ($reassignAgentId)
-                            <span class="text-xs text-neutral-500 dark:text-neutral-400">
-                                {{ $callbackPendingCount }} {{ __('lead(s)') }}
-                            </span>
-                        @endif
-                    </label>
-                </div>
-                @if ($reassignAgentId && !empty($this->reassignStatuses))
-                    <div class="rounded-lg border border-blue-200 bg-blue-50 p-2 dark:border-blue-700 dark:bg-blue-900/20">
-                        <p class="text-xs text-blue-700 dark:text-blue-300">
-                            <strong>{{ $this->selectedLeadsCount }}</strong> {{ __('lead(s) sélectionné(s)') }} sur {{ $untreatedCount }} {{ __('disponible(s)') }}
-                        </p>
-                    </div>
-                @endif
-                @error('reassignStatuses')
-                    <p class="text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
-                @enderror
-            </div>
-
-            <!-- Choix du nombre de leads à réassigner -->
-            <div class="space-y-4">
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                        {{ __('Nombre de leads à réassigner') }}
-                    </label>
-                    <div class="space-y-3">
-                        <label class="flex cursor-pointer items-center gap-3 rounded-lg border border-neutral-200 p-3 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900 {{ $reassignMode === 'all' ? 'border-blue-500 bg-blue-50 dark:border-blue-500 dark:bg-blue-900/20' : '' }}">
-                            <input
-                                type="radio"
-                                wire:model="reassignMode"
-                                value="all"
-                                class="h-4 w-4 text-blue-600 focus:ring-blue-500"
-                            />
-                            <span class="flex-1 text-sm text-neutral-700 dark:text-neutral-300">
-                                {{ __('Tous les leads sélectionnés') }}
-                                @if ($reassignAgentId)
-                                    <span class="ml-2 text-neutral-500 dark:text-neutral-400">
-                                        ({{ $this->selectedLeadsCount }} {{ __('lead(s)') }})
-                                    </span>
-                                @endif
-                            </span>
-                        </label>
-                        <label class="flex cursor-pointer items-center gap-3 rounded-lg border border-neutral-200 p-3 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900 {{ $reassignMode === 'count' ? 'border-blue-500 bg-blue-50 dark:border-blue-500 dark:bg-blue-900/20' : '' }}">
-                            <input
-                                type="radio"
-                                wire:model="reassignMode"
-                                value="count"
-                                class="h-4 w-4 text-blue-600 focus:ring-blue-500"
-                            />
-                            <span class="flex-1 text-sm text-neutral-700 dark:text-neutral-300">
-                                {{ __('Un nombre spécifique') }}
-                            </span>
-                        </label>
-                    </div>
-                </div>
-
-                @if ($reassignMode === 'count')
-                    <div>
-                        <flux:input
-                            type="number"
-                            wire:model="reassignCount"
-                            :label="__('Nombre de leads')"
-                            min="1"
-                            :max="$untreatedCount ?? 999"
-                            required
-                        />
-                        @if ($reassignAgentId)
-                            <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-                                {{ __('Maximum disponible selon sélection') }}: <strong>{{ $this->selectedLeadsCount }}</strong> {{ __('lead(s)') }}
-                            </p>
-                        @endif
-                    </div>
-                @endif
-            </div>
-
-            <flux:select wire:model="reassignToAgentId" :label="__('Réassigner à (optionnel)')">
-                <option value="">{{ __('Distribution automatique') }}</option>
-                @foreach ($this->agents as $agent)
-                    @if ($agent->id !== $reassignAgentId)
-                        <option value="{{ $agent->id }}">
-                            {{ $agent->name }} ({{ $agent->email }}) - {{ $agent->pending_leads_count }} {{ __('en attente') }}
-                        </option>
-                    @endif
-                @endforeach
-            </flux:select>
-
-            <div class="flex items-center justify-end gap-3">
-                <flux:button type="button" wire:click="closeReassignModal" variant="ghost">
-                    {{ __('Annuler') }}
-                </flux:button>
-                <flux:button type="submit" variant="primary">
-                    {{ __('Réassigner') }}
-                </flux:button>
-            </div>
-        </form>
-    </flux:modal>
 </div>
 
 @script
@@ -1161,12 +658,6 @@ new class extends Component
         });
     });
 
-    $wire.on('leads-reassigned', (event) => {
-        $dispatch('notify', {
-            message: event.message || 'Réassignation terminée.',
-            type: 'success'
-        });
-    });
 </script>
 @endscript
 

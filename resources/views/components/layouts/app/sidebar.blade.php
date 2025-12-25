@@ -63,8 +63,9 @@
                 @if (auth()->user()?->role?->slug === 'call_center_owner')
                     <!-- Leads & Distribution -->
                     <flux:navlist.group :heading="__('Leads & Distribution')" class="grid">
-                        <flux:navlist.item icon="user-group" :href="route('owner.leads')" :current="request()->routeIs('owner.leads*')" wire:navigate>{{ __('Leads') }}</flux:navlist.item>
+                        <flux:navlist.item icon="user-group" :href="route('owner.leads')" :current="request()->routeIs('owner.leads*') && !request()->routeIs('owner.leads.reassign')" wire:navigate>{{ __('Leads') }}</flux:navlist.item>
                         <flux:navlist.item icon="arrows-right-left" :href="route('owner.distribution')" :current="request()->routeIs('owner.distribution*')" wire:navigate>{{ __('Distribution') }}</flux:navlist.item>
+                        <flux:navlist.item icon="arrow-path" :href="route('owner.leads.reassign')" :current="request()->routeIs('owner.leads.reassign*')" wire:navigate>{{ __('Réassignation') }}</flux:navlist.item>
                     </flux:navlist.group>
 
                     <!-- Équipe -->
