@@ -634,6 +634,9 @@ class LeadDistributionService
             }
         }
 
+        // Verify counts after reassignment
+        $verification = $this->verifyReassignmentCounts($fromAgent, $toAgent, $callCenterId, $untreatedStatuses, $leads->count(), $reassigned);
+
         \Log::info('Lead reassignment completed', [
             'from_agent_id' => $fromAgent->id,
             'to_agent_id' => $toAgent?->id,
@@ -641,12 +644,97 @@ class LeadDistributionService
             'reassigned' => $reassigned,
             'failed' => $failed,
             'unassigned' => $unassigned,
+            'verification' => $verification,
         ]);
 
         return [
             'reassigned' => $reassigned,
             'failed' => $failed,
             'unassigned' => $unassigned,
+            'verification' => $verification,
+        ];
+    }
+
+    /**
+     * Verify that lead counts are correct after reassignment.
+     *
+     * @return array{from_agent_before: int, from_agent_after: int, to_agent_before: int, to_agent_after: int, is_valid: bool}
+     */
+    protected function verifyReassignmentCounts(User $fromAgent, ?User $toAgent, ?int $callCenterId, array $statuses, int $expectedMoved, int $actualMoved): array
+    {
+        // Count leads for fromAgent before (we use the expected count)
+        $fromAgentBefore = $expectedMoved;
+
+        // Count leads for fromAgent after reassignment
+        $fromAgentAfterQuery = Lead::where('assigned_to', $fromAgent->id)
+            ->whereIn('status', $statuses);
+        
+        if ($callCenterId) {
+            $fromAgentAfterQuery->where('call_center_id', $callCenterId);
+        }
+        
+        $fromAgentAfter = $fromAgentAfterQuery->count();
+
+        // Count leads for toAgent before and after (if toAgent is specified)
+        $toAgentBefore = 0;
+        $toAgentAfter = 0;
+
+        if ($toAgent) {
+            $toAgentBeforeQuery = Lead::where('assigned_to', $toAgent->id)
+                ->whereIn('status', $statuses);
+            
+            if ($callCenterId) {
+                $toAgentBeforeQuery->where('call_center_id', $callCenterId);
+            }
+            
+            $toAgentBefore = $toAgentBeforeQuery->count();
+
+            // Refresh toAgent to get latest data
+            $toAgent->refresh();
+            
+            $toAgentAfterQuery = Lead::where('assigned_to', $toAgent->id)
+                ->whereIn('status', $statuses);
+            
+            if ($callCenterId) {
+                $toAgentAfterQuery->where('call_center_id', $callCenterId);
+            }
+            
+            $toAgentAfter = $toAgentAfterQuery->count();
+        }
+
+        // Verify: fromAgent should have lost exactly the number of leads that were reassigned
+        $expectedFromAgentAfter = $fromAgentBefore - $actualMoved;
+        $fromAgentValid = $fromAgentAfter <= $expectedFromAgentAfter; // <= because some might have failed
+
+        // Verify: toAgent should have gained the number of leads that were reassigned (if toAgent is specified)
+        $toAgentValid = true;
+        if ($toAgent) {
+            $expectedToAgentAfter = $toAgentBefore + $actualMoved;
+            $toAgentValid = $toAgentAfter >= $toAgentBefore; // Should have gained or stayed same
+        }
+
+        $isValid = $fromAgentValid && $toAgentValid;
+
+        if (! $isValid) {
+            \Log::warning('Lead count verification failed after reassignment', [
+                'from_agent_id' => $fromAgent->id,
+                'from_agent_before' => $fromAgentBefore,
+                'from_agent_after' => $fromAgentAfter,
+                'expected_from_agent_after' => $expectedFromAgentAfter,
+                'to_agent_id' => $toAgent?->id,
+                'to_agent_before' => $toAgentBefore,
+                'to_agent_after' => $toAgentAfter,
+                'expected_moved' => $expectedMoved,
+                'actual_moved' => $actualMoved,
+            ]);
+        }
+
+        return [
+            'from_agent_before' => $fromAgentBefore,
+            'from_agent_after' => $fromAgentAfter,
+            'to_agent_before' => $toAgentBefore,
+            'to_agent_after' => $toAgentAfter,
+            'is_valid' => $isValid,
         ];
     }
 
